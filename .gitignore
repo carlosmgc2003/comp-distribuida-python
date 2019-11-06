@@ -1,0 +1,5 @@
+/venv
+/.idea
+matriz.txt
+vector.txt
+*.db
