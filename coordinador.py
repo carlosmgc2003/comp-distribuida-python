@@ -24,12 +24,60 @@ class Servidor:
         self.socket.bind('tcp://0.0.0.0:5000')
 
     def calcular_trabajos(self):
-        return self.parser.cantidad_filas() // TAM_BATCH
+        trabajos_totales = self.parser.cantidad_filas() // TAM_BATCH
+        lista_trabajos = []
+        for i in range(trabajos_totales):
+            fila_inicial = i * TAM_BATCH
+            fila_final = fila_inicial + TAM_BATCH + 1;
+            lista_trabajos.append((fila_inicial, fila_final))
+        return lista_trabajos
 
     def escuchar(self):
+        while len(self.trabajos_pendientes) > 0:
+            self.dirigir_entrantes()
+        else:
+            print("Todos los trabajos enviados")
+
+    def dirigir_entrantes(self):
+        self.respuesta = self.socket.recv_json()
+        if self.respuesta['mens'] == 'disponible':
+            self.enviar_trabajo(self.trabajos_pendientes.pop())
+        if self.respuesta['mens'] == 'solucion':
+            self.recibir_solucion()
+
+    def enviar_trabajo(self, indices):
+        self.socket.send_json({'mens': 'trabajo'})
+        primer_fila = indices[0]
+        ultima_fila = indices[1]
+        # Bucle de envio de filas
+        for nro_fila in range(primer_fila, ultima_fila):
+            # Pido los datos a SQLITE
+            self.parser.cursor.execute("SELECT fila, pos_elemento, valor, resultado_valor "
+                                       "FROM triplas LEFT JOIN resultados "
+                                       "ON triplas.fila = resultados.resultado_fila "
+                                       "WHERE fila = ?;", (nro_fila,))
+            # Bucle de envio de datos
+            for dato in self.parser.cursor.fetchall():
+                respuesta = self.socket.recv_json()
+                if respuesta['mens'] == 'envie datos' or respuesta['mens'] == 'RX' or respuesta[
+                    'mens'] == 'fila RX':
+                    self.socket.send_json({'mens': 'dato',
+                                           'fila': dato[0],
+                                           'pos': dato[1],
+                                           'valor': dato[2],
+                                           'resul': dato[3]}
+                                          )
+            else:  # Cuando se temina el envio de datos mandamos el fin de fila
+                respuesta = self.socket.recv_json()
+                if respuesta['mens'] == 'RX':
+                    self.socket.send_json({'mens': 'fin fila'})
+        else:  # Cuando se termina el envio de filas mandamos fin de trabajo
+            respuesta = self.socket.recv_json()
+            if respuesta['mens'] == 'fila RX':
+                self.socket.send_json({'mens': 'fin trabajo'})
+
+    def recibir_solucion(self):
         pass
-
-
 
 if __name__ == "__main__":
     servidor = Servidor()
@@ -41,37 +89,4 @@ if __name__ == "__main__":
     print("Listo para escuchar")
 
     # Bucle de envio de trabajos
-    for trabajo in range(servidor.calcular_trabajos()):
-        respuesta = servidor.socket.recv_json()
-        if respuesta['mens'] == 'disponible':
-            servidor.socket.send_json({'mens': 'trabajo'})
-            primer_fila = trabajo * TAM_BATCH
-            ultima_fila = primer_fila + TAM_BATCH
-            # Bucle de envio de filas
-            for nro_fila in range(primer_fila, ultima_fila + 1):
-                # Pido los datos a SQLITE
-                servidor.parser.cursor.execute("SELECT fila, pos_elemento, valor, resultado_valor "
-                                      "FROM triplas LEFT JOIN resultados "
-                                      "ON triplas.fila = resultados.resultado_fila "
-                                      "WHERE fila = ?;", (nro_fila,))
-                # Bucle de envio de datos
-                for dato in servidor.parser.cursor.fetchall():
-                    respuesta = servidor.socket.recv_json()
-                    if respuesta['mens'] == 'envie datos' or respuesta['mens'] == 'RX' or respuesta[
-                        'mens'] == 'fila RX':
-                        servidor.socket.send_json({'mens': 'dato',
-                                                   'fila': dato[0],
-                                                   'pos': dato[1],
-                                                   'valor': dato[2],
-                                                   'resul': dato[3]}
-                                                  )
-                else:  # Cuando se temina el envio de datos mandamos el fin de fila
-                    respuesta = servidor.socket.recv_json()
-                    if respuesta['mens'] == 'RX':
-                        servidor.socket.send_json({'mens': 'fin fila'})
-            else:  # Cuando se termina el envio de filas mandamos fin de trabajo
-                respuesta = servidor.socket.recv_json()
-                if respuesta['mens'] == 'fila RX':
-                    servidor.socket.send_json({'mens': 'fin trabajo'})
-    else:
-        print("Todos los trabajos enviados")
+    servidor.escuchar()
