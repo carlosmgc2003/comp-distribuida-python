@@ -2,61 +2,68 @@ import zmq
 import sqlite3
 
 
-def esclavo():
-    contexto = zmq.Context()
-    socket = contexto.socket(zmq.REQ)
-    socket.connect('tcp://localhost:5000')
+class Esclavo:
+    def __init__(self, ip_server):
+        self.ip_server = ip_server
+        self.contexto = zmq.Context()
+        self.socket = self.contexto.socket(zmq.REQ)
+        self.socket.connect(f'tcp://{ip_server}:5000')
+        self.datos_recibidos = []
+        self.conexion = sqlite3.connect('datos_esclavo.db')
+        self.cursor = self.conexion.cursor()
 
-    recibidos = []
-    while True:
+    def recibir_datos(self):
         # Decir que estamos disponible
-        socket.send_json({"mens": "disponible"})
-        respuesta = socket.recv_json()
+        self.socket.send_json({"mens": "disponible"})
+        respuesta = self.socket.recv_json()
         if respuesta['mens'] == 'trabajo':
-            socket.send_json({'mens' : 'envie datos'})
-            respuesta = socket.recv_json()
+            self.socket.send_json({'mens': 'envie datos'})
+            respuesta = self.socket.recv_json()
             while respuesta['mens'] == 'dato':
-                tripla = (respuesta["fila"],respuesta["pos"],respuesta["valor"],respuesta["resul"])
-                recibidos.append(tripla)
+                tripla = (respuesta["fila"], respuesta["pos"], respuesta["valor"], respuesta["resul"])
+                self.datos_recibidos.append(tripla)
                 print(f'Fila: {respuesta["fila"]}, '
                       f'Pos: {respuesta["pos"]}, '
                       f'Valor: {respuesta["valor"]}, '
                       f'Resultado: {respuesta["resul"]}')
-                socket.send_json({'mens': 'RX'})
-                respuesta = socket.recv_json()
+                self.socket.send_json({'mens': 'RX'})
+                respuesta = self.socket.recv_json()
                 if respuesta['mens'] == 'dato':
                     continue
                 elif respuesta['mens'] == 'fin fila':
-                    socket.send_json({'mens' : 'fila RX'})
-                    respuesta = socket.recv_json()
+                    self.socket.send_json({'mens': 'fila RX'})
+                    respuesta = self.socket.recv_json()
                     continue
                 else:
-                    socket.close()
                     break
-        break
-    return recibidos
+            print(f'Se recibieron {len(self.datos_recibidos)} datos.')
+
+    def escribir_datos(self):
+        self.cursor.execute("DROP TABLE IF EXISTS datos;")
+        self.cursor.execute("CREATE TABLE datos(triplaId INTEGER PRIMARY KEY, "
+                            "fila INTEGER, "
+                            "pos_elemento INTEGER, "
+                            "valor REAL, "
+                            "resultado REAL);")
+        for tupla in self.datos_recibidos:
+            self.cursor.execute("INSERT INTO datos(fila, "
+                                "pos_elemento, "
+                                "valor, "
+                                "resultado) "
+                                "VALUES (?, ?, ?, ?)",
+                                tupla)
+        self.conexion.commit()
+
+    def enviar_solucion(self):
+        pass
+        # self.socket.send_json({'mens':'solucion'})
+        # self.cursor.execute("SELECT variable, solucion FROM solucion;")
+        # for dupla in self.cursor.fetchall():
+
 
 
 if __name__ == "__main__":
-        recibidos = esclavo()
-        conexion = sqlite3.connect('datos_esclavo.db')
-        cursor = conexion.cursor()
-        cursor.execute("DROP TABLE IF EXISTS datos;")
-        cursor.execute("CREATE TABLE datos(triplaId INTEGER PRIMARY KEY, "
-                       "fila INTEGER, "
-                       "pos_elemento INTEGER, "
-                       "valor REAL, "
-                       "resultado REAL);")
-        for tupla in recibidos:
-            cursor.execute("INSERT INTO datos(fila, "
-                           "pos_elemento, "
-                           "valor, "
-                           "resultado) "
-                           "VALUES (?, ?, ?, ?)",
-                           tupla)
-        conexion.commit()
-
-
-
-
-
+    ip_servidor = input("Ingrese la IP del Servidor:")
+    esclavo = Esclavo(ip_servidor)
+    esclavo.recibir_datos()
+    esclavo.escribir_datos()

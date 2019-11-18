@@ -41,7 +41,9 @@ class Servidor:
     def dirigir_entrantes(self):
         self.respuesta = self.socket.recv_json()
         if self.respuesta['mens'] == 'disponible':
-            self.enviar_trabajo(self.trabajos_pendientes.pop())
+            trabajo_a_despachar = self.trabajos_pendientes.pop()
+            self.enviar_trabajo(trabajo_a_despachar)
+            print(f'Se entregó el trabajo de fila {trabajo_a_despachar[0]} a fila {trabajo_a_despachar[1]}.')
         if self.respuesta['mens'] == 'solucion':
             self.recibir_solucion()
 
@@ -87,6 +89,4 @@ if __name__ == "__main__":
     print(f'Cantidad de resultados (no nulos) = {servidor.parser.cursor.fetchone()[0]}')
     print(f'Cantidad de trabajos: {servidor.calcular_trabajos()}')
     print("Listo para escuchar")
-
-    # Bucle de envio de trabajos
     servidor.escuchar()
