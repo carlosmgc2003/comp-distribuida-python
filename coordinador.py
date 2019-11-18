@@ -14,6 +14,7 @@ class Servidor:
         self.contexto = zmq.Context()
         self.socket = None
         self.respuesta = None
+        self.solucion = []
         self.trabajos_pendientes = self.calcular_trabajos()
         self.iniciar_comunicacion()
 
@@ -35,20 +36,24 @@ class Servidor:
 
     def escuchar(self):
         """ MainLoop principal de la clase donde se debe volver despues de cada actividad concretada."""
-        while len(self.trabajos_pendientes) > 0:
+        while len(self.solucion) < self.parser.cantidad_filas():
+            self.respuesta = self.socket.recv_json()
             self.dirigir_entrantes()
         else:
-            print("Todos los trabajos enviados")
+            # Aca va que hacer cuando ya no se necesita escuchar mas la red, es decir
+            # que se termino de solucionar el problema.
+            print("Tarea Completada")
 
     def dirigir_entrantes(self):
         """ Con cada mensaje principal entrante lo despacha al metodo que corresponde para su procesamiento"""
-        self.respuesta = self.socket.recv_json()
+        print(self.respuesta)
         if self.respuesta['mens'] == 'disponible':
             # Hay un esclavo disponible para procesar, le enviamos trabajo y lo eliminamos de los pendientes
             trabajo_a_despachar = self.trabajos_pendientes.pop()
             self.enviar_trabajo(trabajo_a_despachar)
             print(f'Se entregó el trabajo de fila {trabajo_a_despachar[0]} a fila {trabajo_a_despachar[1]}.')
-        if self.respuesta['mens'] == 'solucion':
+            print(f'Quedan {len(self.trabajos_pendientes) + 1} trabajos.')
+        if self.respuesta['mens'] == 'solucion lista':
             self.recibir_solucion()
 
     def enviar_trabajo(self, indices):
@@ -85,8 +90,18 @@ class Servidor:
                 self.socket.send_json({'mens': 'fin trabajo'})
 
     def recibir_solucion(self):
-        pass
-
+        self.socket.send_json({'mens': 'listo RX'})
+        self.respuesta = self.socket.recv_json()
+        solucion_parcial = []
+        while self.respuesta['mens'] == 'solucion':
+            dupla = self.respuesta['variable'], self.respuesta['solucion']
+            solucion_parcial.append(dupla)
+            self.socket.send_json({'mens': 'RX'})
+            self.respuesta = self.socket.recv_json()
+        else:
+            self.socket.send_json({'mens': 'solucion RX'})
+            print(f'Se recibieron {len(solucion_parcial)} soluciones')
+            self.solucion.append(solucion_parcial)
 
 if __name__ == "__main__":
     servidor = Servidor()

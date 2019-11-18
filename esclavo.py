@@ -1,5 +1,6 @@
 import zmq
 import sqlite3
+from subprocess import run
 
 
 class Esclavo:
@@ -58,15 +59,28 @@ class Esclavo:
         self.conexion.commit()
 
     def calcular_solucion(self):
-        """Llama a un programa externo en C++ para realizar el calculo numerico del jacobi parcial"""
-        pass
+        run("./comp_distribuida", capture_output=True)
 
     def enviar_solucion(self):
         """Lee los datos calculados por el programa en C++ para luego enviarselo al servidor de problemas"""
-        pass
-        # self.socket.send_json({'mens':'solucion'})
-        # self.cursor.execute("SELECT variable, solucion FROM solucion;")
-        # for dupla in self.cursor.fetchall():
+        self.socket.send_json({'mens': 'solucion lista'})
+        respuesta = self.socket.recv_json()
+        if respuesta['mens'] == 'listo RX':
+            self.cursor.execute("SELECT variable, solucion FROM solucion;")
+            for dupla in self.cursor.fetchall():
+                self.socket.send_json({'mens': 'solucion',
+                                       'variable': dupla[0],
+                                       'solucion': dupla[1]})
+                respuesta = self.socket.recv_json()
+                if respuesta['mens'] == 'RX':
+                    # Aca queda el lugar para el manejo de errores
+                    continue
+            else:
+                self.socket.send_json({'mens': 'fin solucion'})
+                respuesta = self.socket.recv_json()
+                if respuesta['mens'] == 'solucion RX':
+                    print("Terminado el trabajo de este esclavo")
+                    self.socket.close()
 
 
 if __name__ == "__main__":
@@ -74,3 +88,5 @@ if __name__ == "__main__":
     esclavo = Esclavo(ip_servidor)
     esclavo.recibir_datos()
     esclavo.escribir_datos()
+    esclavo.calcular_solucion()
+    esclavo.enviar_solucion()
