@@ -1,5 +1,4 @@
 /venv
 /.idea
-matriz.txt
-vector.txt
+*.txt
 *.db
