@@ -1,10 +1,8 @@
 import zmq
-import time
+
 import analizador
 
 TAM_BATCH = 400
-
-
 
 
 class Servidor:
@@ -20,10 +18,13 @@ class Servidor:
         self.iniciar_comunicacion()
 
     def iniciar_comunicacion(self):
+        """Asignar rol y numero al puerto"""
         self.socket = self.contexto.socket(zmq.REP)
         self.socket.bind('tcp://0.0.0.0:5000')
 
     def calcular_trabajos(self):
+        """Genera una lista de duplas con los indices de inicio y fin de cada trabajo
+        que se entregará a los esclavos"""
         trabajos_totales = self.parser.cantidad_filas() // TAM_BATCH
         lista_trabajos = []
         for i in range(trabajos_totales):
@@ -33,14 +34,17 @@ class Servidor:
         return lista_trabajos
 
     def escuchar(self):
+        """ MainLoop principal de la clase donde se debe volver despues de cada actividad concretada."""
         while len(self.trabajos_pendientes) > 0:
             self.dirigir_entrantes()
         else:
             print("Todos los trabajos enviados")
 
     def dirigir_entrantes(self):
+        """ Con cada mensaje principal entrante lo despacha al metodo que corresponde para su procesamiento"""
         self.respuesta = self.socket.recv_json()
         if self.respuesta['mens'] == 'disponible':
+            # Hay un esclavo disponible para procesar, le enviamos trabajo y lo eliminamos de los pendientes
             trabajo_a_despachar = self.trabajos_pendientes.pop()
             self.enviar_trabajo(trabajo_a_despachar)
             print(f'Se entregó el trabajo de fila {trabajo_a_despachar[0]} a fila {trabajo_a_despachar[1]}.')
@@ -48,6 +52,8 @@ class Servidor:
             self.recibir_solucion()
 
     def enviar_trabajo(self, indices):
+        """ Envia todos los datos de un trabajo a un esclavo
+        :keyword indices = tuple(indice_inicial, indice_final)"""
         self.socket.send_json({'mens': 'trabajo'})
         primer_fila = indices[0]
         ultima_fila = indices[1]
@@ -80,6 +86,7 @@ class Servidor:
 
     def recibir_solucion(self):
         pass
+
 
 if __name__ == "__main__":
     servidor = Servidor()

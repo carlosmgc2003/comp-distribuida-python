@@ -13,6 +13,8 @@ class Esclavo:
         self.cursor = self.conexion.cursor()
 
     def recibir_datos(self):
+        """Estando conectado a un servidor de problema, le notifica que esta listo para recibir
+        datos y los recibe."""
         # Decir que estamos disponible
         self.socket.send_json({"mens": "disponible"})
         respuesta = self.socket.recv_json()
@@ -39,6 +41,7 @@ class Esclavo:
             print(f'Se recibieron {len(self.datos_recibidos)} datos.')
 
     def escribir_datos(self):
+        """Almacena los datos recibidos del servidor en una BD SQLite. Si existe lo elimina"""
         self.cursor.execute("DROP TABLE IF EXISTS datos;")
         self.cursor.execute("CREATE TABLE datos(triplaId INTEGER PRIMARY KEY, "
                             "fila INTEGER, "
@@ -54,12 +57,16 @@ class Esclavo:
                                 tupla)
         self.conexion.commit()
 
+    def calcular_solucion(self):
+        """Llama a un programa externo en C++ para realizar el calculo numerico del jacobi parcial"""
+        pass
+
     def enviar_solucion(self):
+        """Lee los datos calculados por el programa en C++ para luego enviarselo al servidor de problemas"""
         pass
         # self.socket.send_json({'mens':'solucion'})
         # self.cursor.execute("SELECT variable, solucion FROM solucion;")
         # for dupla in self.cursor.fetchall():
-
 
 
 if __name__ == "__main__":
