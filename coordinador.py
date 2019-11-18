@@ -2,6 +2,11 @@ import zmq
 
 import analizador
 
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.pyplot as plt
+from matplotlib import cm
+import numpy as np
+
 TAM_BATCH = 400
 
 
@@ -37,9 +42,9 @@ class Servidor:
     def escuchar(self):
         """ MainLoop principal de la clase donde se debe volver despues de cada actividad concretada."""
         while len(self.solucion) < self.parser.cantidad_filas():
-            print(f'Hay {len(self.solucion)} soluciones en total')
             self.respuesta = self.socket.recv_json()
             self.dirigir_entrantes()
+            print(f'Hay {len(self.solucion)} soluciones en total')
         else:
             # Aca va que hacer cuando ya no se necesita escuchar mas la red, es decir
             # que se termino de solucionar el problema.
@@ -113,3 +118,15 @@ if __name__ == "__main__":
     print(f'Cantidad de trabajos: {servidor.calcular_trabajos()}')
     print("Listo para escuchar")
     servidor.escuchar()
+    solucion_ordenada = sorted(servidor.solucion, key=lambda tup: tup[0])
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+    x = np.arange(0, 40)
+    y = np.arange(0, 40)
+    x, y = np.meshgrid(x, y)
+    z = np.array([item[1] for item in solucion_ordenada]).reshape((40, 40))
+    z = np.rot90(z)
+    ax.plot_surface(x, y, z, cmap=cm.coolwarm, linewidth=0, antialiased=False)
+
+    plt.show()
