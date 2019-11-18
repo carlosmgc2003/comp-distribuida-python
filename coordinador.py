@@ -37,6 +37,7 @@ class Servidor:
     def escuchar(self):
         """ MainLoop principal de la clase donde se debe volver despues de cada actividad concretada."""
         while len(self.solucion) < self.parser.cantidad_filas():
+            print(f'Hay {len(self.solucion)} soluciones en total')
             self.respuesta = self.socket.recv_json()
             self.dirigir_entrantes()
         else:
@@ -46,13 +47,12 @@ class Servidor:
 
     def dirigir_entrantes(self):
         """ Con cada mensaje principal entrante lo despacha al metodo que corresponde para su procesamiento"""
-        print(self.respuesta)
         if self.respuesta['mens'] == 'disponible':
             # Hay un esclavo disponible para procesar, le enviamos trabajo y lo eliminamos de los pendientes
             trabajo_a_despachar = self.trabajos_pendientes.pop()
             self.enviar_trabajo(trabajo_a_despachar)
             print(f'Se entregó el trabajo de fila {trabajo_a_despachar[0]} a fila {trabajo_a_despachar[1]}.')
-            print(f'Quedan {len(self.trabajos_pendientes) + 1} trabajos.')
+            print(f'Quedan {len(self.trabajos_pendientes) + 1} trabajos pendientes.')
         if self.respuesta['mens'] == 'solucion lista':
             self.recibir_solucion()
 
@@ -101,7 +101,8 @@ class Servidor:
         else:
             self.socket.send_json({'mens': 'solucion RX'})
             print(f'Se recibieron {len(solucion_parcial)} soluciones')
-            self.solucion.append(solucion_parcial)
+            for item in solucion_parcial:
+                self.solucion.append(item)
 
 if __name__ == "__main__":
     servidor = Servidor()

@@ -1,7 +1,7 @@
 import zmq
 import sqlite3
 from subprocess import run
-
+from time import perf_counter
 
 class Esclavo:
     def __init__(self, ip_server):
@@ -12,11 +12,13 @@ class Esclavo:
         self.datos_recibidos = []
         self.conexion = sqlite3.connect('datos_esclavo.db')
         self.cursor = self.conexion.cursor()
+        print('INICIO CORRECTO'.center(50, '='))
 
     def recibir_datos(self):
         """Estando conectado a un servidor de problema, le notifica que esta listo para recibir
         datos y los recibe."""
         # Decir que estamos disponible
+        self.datos_recibidos.clear()
         self.socket.send_json({"mens": "disponible"})
         respuesta = self.socket.recv_json()
         if respuesta['mens'] == 'trabajo':
@@ -25,10 +27,6 @@ class Esclavo:
             while respuesta['mens'] == 'dato':
                 tripla = (respuesta["fila"], respuesta["pos"], respuesta["valor"], respuesta["resul"])
                 self.datos_recibidos.append(tripla)
-                print(f'Fila: {respuesta["fila"]}, '
-                      f'Pos: {respuesta["pos"]}, '
-                      f'Valor: {respuesta["valor"]}, '
-                      f'Resultado: {respuesta["resul"]}')
                 self.socket.send_json({'mens': 'RX'})
                 respuesta = self.socket.recv_json()
                 if respuesta['mens'] == 'dato':
@@ -39,6 +37,7 @@ class Esclavo:
                     continue
                 else:
                     break
+            print('DATOS RECIBIDOS'.center(50, '='))
             print(f'Se recibieron {len(self.datos_recibidos)} datos.')
 
     def escribir_datos(self):
@@ -59,7 +58,12 @@ class Esclavo:
         self.conexion.commit()
 
     def calcular_solucion(self):
+        start = perf_counter()
         run("./comp_distribuida", capture_output=True)
+        end = perf_counter()
+        execution_time = (end - start)
+        print(f'Tiempo de calculo {execution_time} seg.'.center(50, '='))
+        print('DATOS CALCULADOS'.center(50, '='))
 
     def enviar_solucion(self):
         """Lee los datos calculados por el programa en C++ para luego enviarselo al servidor de problemas"""
@@ -79,14 +83,16 @@ class Esclavo:
                 self.socket.send_json({'mens': 'fin solucion'})
                 respuesta = self.socket.recv_json()
                 if respuesta['mens'] == 'solucion RX':
-                    print("Terminado el trabajo de este esclavo")
-                    self.socket.close()
+                    print("TERMINADO".center(50, '='))
 
 
 if __name__ == "__main__":
-    ip_servidor = input("Ingrese la IP del Servidor:")
+    ip_servidor = input("Ingrese la IP del Servidor [localhost]: ")
+    if len(ip_servidor) == 0:
+        ip_servidor = 'localhost'
     esclavo = Esclavo(ip_servidor)
-    esclavo.recibir_datos()
-    esclavo.escribir_datos()
-    esclavo.calcular_solucion()
-    esclavo.enviar_solucion()
+    while True:
+        esclavo.recibir_datos()
+        esclavo.escribir_datos()
+        esclavo.calcular_solucion()
+        esclavo.enviar_solucion()
