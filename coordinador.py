@@ -2,7 +2,7 @@ import zmq
 import time
 import analizador
 
-TAM_BATCH = 1599
+TAM_BATCH = 400
 
 
 
@@ -28,7 +28,7 @@ class Servidor:
         lista_trabajos = []
         for i in range(trabajos_totales):
             fila_inicial = i * TAM_BATCH
-            fila_final = fila_inicial + TAM_BATCH + 1;
+            fila_final = fila_inicial + TAM_BATCH
             lista_trabajos.append((fila_inicial, fila_final))
         return lista_trabajos
 

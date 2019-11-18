@@ -56,7 +56,7 @@ class AnalizaArchivos:
         self.db.commit()
 
     def cantidad_filas(self):
-        self.cursor.execute('SELECT MAX(fila) FROM triplas')
+        self.cursor.execute('SELECT COUNT(DISTINCT fila) FROM triplas;')
         return self.cursor.fetchone()[0]
 # if __name__ == '__main__':
 #     pass
