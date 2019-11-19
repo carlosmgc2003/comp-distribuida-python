@@ -9,30 +9,35 @@ class Esclavo:
     def __init__(self, ip_server):
         self.ip_server = ip_server
         self.datos_recibidos = []
-        self.contexto = None
+        self.contexto = zmq.Context()
         self.socket = None
+        self.poll = zmq.Poller()
         self.iniciar_contexto()
         self.conexion = sqlite3.connect('datos_esclavo.db')
         self.cursor = self.conexion.cursor()
         print('INICIO CORRECTO'.center(50, '='))
 
-    def iniciar_contexto(self):
-        self.contexto = zmq.Context()
+    def iniciar_polled_socket(self):
         self.socket = self.contexto.socket(zmq.REQ)
+        self.socket.connect(f'tcp://{self.ip_server}:5000')
+        poll.register(self.socket, zmq.POLLIN)
+
+    def cerrar_polled_socket(self):
+        self.socket.setsockopt(zmq.LINGER, 0) # Descartar de forma inmediata los mensajes
+        self.socket.close()
+        self.poll.unregister(self.socket)
 
     def recibir_datos(self):
         """Estando conectado a un servidor de problema, le notifica que esta listo para recibir
         datos y los recibe."""
         # Decir que estamos disponible
         self.datos_recibidos.clear()
-        self.socket.connect(f'tcp://{self.ip_server}:5000')
-        poll = zmq.Poller()
-        poll.register(self.socket, zmq.POLLIN)
+        self.iniciar_polled_socket()
         while not self.datos_recibidos:
             self.socket.send_json({"mens": "disponible"})
             espero_respuesta = True
             while espero_respuesta:
-                socks = dict(poll.poll(REQUEST_TIMEOUT))
+                socks = dict(self.poll.poll(REQUEST_TIMEOUT))
                 if socks.get(self.socket) == zmq.POLLIN:
                     respuesta = self.socket.recv_json()
                     if not respuesta:
@@ -58,12 +63,8 @@ class Esclavo:
                         print(f'Se recibieron {len(self.datos_recibidos)} datos.')
                         self.socket.disconnect(f'tcp://{self.ip_server}:5000')
                 else:
-                    self.socket.setsockopt(zmq.LINGER, 0)
-                    self.socket.close()
-                    poll.unregister(self.socket)
-                    self.socket = self.contexto.socket(zmq.REQ)
-                    self.socket.connect(f'tcp://{self.ip_server}:5000')
-                    poll.register(self.socket, zmq.POLLIN)
+                    self.cerrar_polled_socket()
+                    self.inicar_polled_socket()
                     self.socket.send_json({"mens": "disponible"})
 
 
@@ -96,30 +97,38 @@ class Esclavo:
 
     def enviar_solucion(self):
         """Lee los datos calculados por el programa en C++ para luego enviarselo al servidor de problemas"""
-        self.socket.connect(f'tcp://{self.ip_server}:5000')
-        self.socket.send_json({'mens': 'solucion lista'})
-        respuesta = self.socket.recv_json()
-        if respuesta['mens'] == 'listo RX':
-            self.cursor.execute("SELECT variable, solucion FROM solucion;")
-            for dupla in self.cursor.fetchall():
-                self.socket.send_json({'mens': 'solucion',
-                                       'variable': dupla[0],
-                                       'solucion': dupla[1]})
-                respuesta = self.socket.recv_json()
-                if respuesta['mens'] == 'RX':
-                    # Aca queda el lugar para el manejo de errores
-                    continue
-            else:
-                self.socket.send_json({'mens': 'fin solucion'})
-                respuesta = self.socket.recv_json()
-                if respuesta['mens'] == 'solucion RX':
-                    print("SOLUCION ENVIADA".center(50, '='))
-                self.socket.disconnect(f'tcp://{self.ip_server}:5000')
+        self.iniciar_polled_socket()
+        solucion_enviada = False
+        while not solucion_enviada:
+            self.socket.send_json({'mens': 'solucion lista'})
+            espero_respuesta = True
+            while espero_respuesta:
+                socks = dict(self.poll.poll(REQUEST_TIMEOUT))
+                if socks.get(self.socket) == zmq.POLLIN:
+                    respuesta = self.socket.recv_json()
+                    if not respuesta:
+                        break
+                    if respuesta['mens'] == 'listo RX':
+                        espero_respuesta = False
+                        self.cursor.execute("SELECT variable, solucion FROM solucion;")
+                        for dupla in self.cursor.fetchall():
+                            self.socket.send_json({'mens': 'solucion',
+                                                'variable': dupla[0],
+                                                'solucion': dupla[1]})
+                            respuesta = self.socket.recv_json()
+                            if respuesta['mens'] == 'RX':
+                                continue
+                        else:
+                            self.socket.send_json({'mens': 'fin solucion'})
+                            respuesta = self.socket.recv_json()
+                            if respuesta['mens'] == 'solucion RX':
+                                print("SOLUCION ENVIADA".center(50, '='))
+                            self.socket.disconnect(f'tcp://{self.ip_server}:5000')
+                else:
+                    self.cerrar_polled_socket()
+                    self.inicar_polled_socket()
+                    self.socket.send_json({'mens': 'solucion lista'})
 
-    def cerrar_contexto(self):
-        self.socket.close()
-        self.contexto.destroy()
-        self.iniciar_contexto()
 
 if __name__ == "__main__":
     ip_servidor = input("Ingrese la IP del Servidor [localhost]: ")
@@ -131,4 +140,3 @@ if __name__ == "__main__":
         esclavo.escribir_datos()
         esclavo.calcular_solucion()
         esclavo.enviar_solucion()
-        esclavo.cerrar_contexto()
