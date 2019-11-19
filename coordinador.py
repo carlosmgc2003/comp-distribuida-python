@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 from matplotlib import cm
 import numpy as np
 
-TAM_BATCH = 400
+TAM_BATCH = 800
 
 
 class Servidor:
@@ -44,7 +44,7 @@ class Servidor:
         while len(self.solucion) < self.parser.cantidad_filas():
             self.respuesta = self.socket.recv_json()
             self.dirigir_entrantes()
-            print(f'Hay {len(self.solucion)} soluciones en total')
+            print(f'Hay {len(self.solucion)} soluciones en total'.center(50, '='))
         else:
             # Aca va que hacer cuando ya no se necesita escuchar mas la red, es decir
             # que se termino de solucionar el problema.
@@ -111,13 +111,16 @@ class Servidor:
 
 if __name__ == "__main__":
     servidor = Servidor()
+    print("SERVIDOR INICIADO".center(50, '='))
     servidor.parser.cursor.execute('SELECT COUNT(*) FROM triplas;')
-    print(f'Cantidad de triplas = {servidor.parser.cursor.fetchone()[0]}')
+    print(f'Cantidad de triplas = {servidor.parser.cursor.fetchone()[0]}'.center(50, '='))
     servidor.parser.cursor.execute('SELECT COUNT(*) FROM resultados;')
-    print(f'Cantidad de resultados (no nulos) = {servidor.parser.cursor.fetchone()[0]}')
+    print(f'Cantidad de resultados (no nulos) = {servidor.parser.cursor.fetchone()[0]}'.center(50, '='))
+    print("ARCHIVO DE DATOS ANALIZADO".center(50, '='))
     print(f'Cantidad de trabajos: {servidor.calcular_trabajos()}')
-    print("Listo para escuchar")
+    print("Listo para escuchar".center(50, '='))
     servidor.escuchar()
+    print("SOLUCION".center(50, '='))
     solucion_ordenada = sorted(servidor.solucion, key=lambda tup: tup[0])
 
     fig = plt.figure()
@@ -128,5 +131,5 @@ if __name__ == "__main__":
     z = np.array([item[1] for item in solucion_ordenada]).reshape((40, 40))
     z = np.rot90(z)
     ax.plot_surface(x, y, z, cmap=cm.coolwarm, linewidth=0, antialiased=False)
-
+    plt.title(f'Gráfico de solución para tamaño de batch de {TAM_BATCH}')
     plt.show()
