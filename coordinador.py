@@ -23,6 +23,23 @@ class Servidor:
         self.solucion = []
         self.lista_pendientes = self.calcular_trabajos()
         self.iniciar_comunicacion()
+        self.mensaje_inicial()
+
+    def mensaje_inicial(self):
+        print("SERVIDOR INICIADO".center(50, '='))
+        self.parser.cursor.execute('SELECT COUNT(*) FROM triplas;')
+        print(f'Cantidad de triplas = {self.parser.cursor.fetchone()[0]}'.center(50, '='))
+        self.parser.cursor.execute('SELECT COUNT(*) FROM resultados;')
+        print(f'Cantidad de resultados (no nulos) = {self.parser.cursor.fetchone()[0]}'.center(50, '='))
+        print("ARCHIVO DE DATOS ANALIZADO".center(50, '='))
+        print(f'Cantidad de trabajos: {len(self.calcular_trabajos())}'.center(50, '='))
+        print("Listo para escuchar".center(50, '='))
+        self.escuchar()
+
+    def mostrar_solucion(self):
+        print("SOLUCION".center(50, '='))
+        pprint(self.solucion, compact=True)
+        self.graficar_solucion()
 
     def iniciar_comunicacion(self):
         """Asignar rol y numero al puerto"""
@@ -58,12 +75,14 @@ class Servidor:
     def dirigir_entrantes(self):
         """ Con cada mensaje principal entrante lo despacha al metodo que corresponde para su procesamiento"""
         if self.respuesta['mens'] == 'disponible':
+            print("ENVIANDO TRABAJO".center(50, '='))
             # Hay un esclavo disponible para procesar, le enviamos trabajo y lo eliminamos de los pendientes
             trabajo_a_despachar = self.lista_pendientes.pop()
             enviado = self.enviar_trabajo(trabajo_a_despachar)
             if not enviado:
                 self.lista_pendientes.append(trabajo_a_despachar)
         if self.respuesta['mens'] == 'solucion lista':
+            print("RECIBIENDO SOLUCION".center(50, '='))
             self.recibir_solucion()
 
     def enviar_trabajo(self, indices):
@@ -104,6 +123,7 @@ class Servidor:
             respuesta = self.socket.recv_json()
             if respuesta['mens'] == 'fila RX':
                 self.socket.send_json({'mens': 'fin trabajo'})
+                print("TRABAJO ENVIADO".center(50, '='))
                 return True
         return False
 
@@ -122,6 +142,7 @@ class Servidor:
             self.solucion.extend(sorted(solucion_parcial, key=lambda tup: tup[0]))
         self.parser.actualizar_semilla(self.solucion)
         self.solucion.sort(key=lambda tup: tup[0])
+        print("SOLUCION RECIBIDA".center(50, '='))
 
     def graficar_solucion(self):
         fig = plt.figure()
@@ -138,16 +159,5 @@ class Servidor:
 
 
 if __name__ == "__main__":
-    servidor = Servidor(veces=3, tam_batch=1600, vector_result='vector.txt', matriz='matriz.txt')
-    print("SERVIDOR INICIADO".center(50, '='))
-    servidor.parser.cursor.execute('SELECT COUNT(*) FROM triplas;')
-    print(f'Cantidad de triplas = {servidor.parser.cursor.fetchone()[0]}'.center(50, '='))
-    servidor.parser.cursor.execute('SELECT COUNT(*) FROM resultados;')
-    print(f'Cantidad de resultados (no nulos) = {servidor.parser.cursor.fetchone()[0]}'.center(50, '='))
-    print("ARCHIVO DE DATOS ANALIZADO".center(50, '='))
-    print(f'Cantidad de trabajos: {len(servidor.calcular_trabajos())}'.center(50, '='))
-    print("Listo para escuchar".center(50, '='))
-    servidor.escuchar()
-    print("SOLUCION".center(50, '='))
-    pprint(servidor.solucion, compact=True)
-    servidor.graficar_solucion()
+    app = Servidor(veces=3, tam_batch=400, vector_result='vector.txt', matriz='matriz.txt')
+    app.mostrar_solucion()

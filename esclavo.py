@@ -92,7 +92,7 @@ class Esclavo:
     def calcular_solucion(self):
         print('PROCESANDO'.center(50, '='))
         start = perf_counter()
-        run("./comp_distribuida", capture_output=True)
+        run("./comp_distribuida", stdout=False)
         end = perf_counter()
         execution_time = (end - start)
         print(f'Tiempo de calculo {execution_time} seg.'.center(50, '='))
