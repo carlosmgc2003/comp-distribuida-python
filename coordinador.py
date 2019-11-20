@@ -11,7 +11,8 @@ from pprint import pprint
 
 
 class Servidor:
-    def __init__(self, vector_result, matriz, tam_batch):
+    def __init__(self, veces, vector_result, matriz, tam_batch):
+        self.veces = veces
         self.tam_batch = tam_batch
         self.parser = analizador.AnalizaArchivos()
         self.parser.analiza_archivos(vector_result, modo='vector')
@@ -21,8 +22,6 @@ class Servidor:
         self.respuesta = None
         self.solucion = []
         self.lista_pendientes = self.calcular_trabajos()
-        self.trabajos_a_despachar = []
-        self.trabajos_despachados = []
         self.iniciar_comunicacion()
 
     def iniciar_comunicacion(self):
@@ -43,13 +42,18 @@ class Servidor:
 
     def escuchar(self):
         """ MainLoop principal de la clase donde se debe volver despues de cada actividad concretada."""
-        while len(self.solucion) < self.parser.cantidad_filas():
-            self.respuesta = self.socket.recv_json()
-            self.dirigir_entrantes()
-        else:
-            # Aca va que hacer cuando ya no se necesita escuchar mas la red, es decir
-            # que se termino de solucionar el problema.
-            print("Tarea Completada".center(50, '='))
+        while self.veces > 0:
+            while len(self.solucion) < self.parser.cantidad_filas():
+                self.respuesta = self.socket.recv_json()
+                self.dirigir_entrantes()
+            else:
+                # Aca va que hacer cuando ya no se necesita escuchar mas la red, es decir
+                # que se termino de solucionar el problema.
+                print("PASADA COMPLETADA".center(50, '!'))
+                if self.veces > 1:
+                    self.solucion.clear()
+                    self.lista_pendientes = self.calcular_trabajos()
+            self.veces -= 1
 
     def dirigir_entrantes(self):
         """ Con cada mensaje principal entrante lo despacha al metodo que corresponde para su procesamiento"""
@@ -71,10 +75,15 @@ class Servidor:
         # Bucle de envio de filas
         for nro_fila in range(primer_fila, ultima_fila):
             # Pido los datos a SQLITE
-            self.parser.cursor.execute("SELECT fila, pos_elemento, valor_coef, resultado_valor "
+            self.parser.cursor.execute("SELECT triplas.fila, "
+                                       "triplas.pos_elemento, "
+                                       "triplas.valor_coef, "
+                                       "resultados.resultado_valor, "
+                                       "semilla.valor_semilla "
                                        "FROM triplas "
                                        "LEFT JOIN resultados ON triplas.fila = resultados.resultado_fila "
-                                       "WHERE fila = ?;", (nro_fila,))
+                                       "LEFT JOIN semilla ON triplas.fila = semilla.variable "
+                                       "WHERE fila = ? AND variable = ?;", (nro_fila, nro_fila))
             # Bucle de envio de datos
             for dato in self.parser.cursor.fetchall():
                 respuesta = self.socket.recv_json()
@@ -84,7 +93,8 @@ class Servidor:
                                            'fila': dato[0],
                                            'pos': dato[1],
                                            'valor': dato[2],
-                                           'resul': dato[3]}
+                                           'resul': dato[3],
+                                           'semil': dato[4]}
                                           )
             else:  # Cuando se temina el envio de datos mandamos el fin de fila
                 respuesta = self.socket.recv_json()
@@ -128,7 +138,7 @@ class Servidor:
 
 
 if __name__ == "__main__":
-    servidor = Servidor(tam_batch=400, vector_result='vector.txt', matriz='matriz.txt')
+    servidor = Servidor(veces=3, tam_batch=1600, vector_result='vector.txt', matriz='matriz.txt')
     print("SERVIDOR INICIADO".center(50, '='))
     servidor.parser.cursor.execute('SELECT COUNT(*) FROM triplas;')
     print(f'Cantidad de triplas = {servidor.parser.cursor.fetchone()[0]}'.center(50, '='))
@@ -137,7 +147,6 @@ if __name__ == "__main__":
     print("ARCHIVO DE DATOS ANALIZADO".center(50, '='))
     print(f'Cantidad de trabajos: {len(servidor.calcular_trabajos())}'.center(50, '='))
     print("Listo para escuchar".center(50, '='))
-
     servidor.escuchar()
     print("SOLUCION".center(50, '='))
     pprint(servidor.solucion, compact=True)

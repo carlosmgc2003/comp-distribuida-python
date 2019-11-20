@@ -47,7 +47,8 @@ class Esclavo:
                         self.socket.send_json({'mens': 'envie datos'})
                         respuesta = self.socket.recv_json()
                         while respuesta['mens'] == 'dato':
-                            tripla = (respuesta["fila"], respuesta["pos"], respuesta["valor"], respuesta["resul"])
+                            tripla = (respuesta["fila"], respuesta["pos"], respuesta["valor"], respuesta["resul"],
+                                      respuesta["semil"])
                             self.datos_recibidos.append(tripla)
                             self.socket.send_json({'mens': 'RX'})
                             respuesta = self.socket.recv_json()
@@ -60,7 +61,7 @@ class Esclavo:
                             else:
                                 break
                         print('DATOS RECIBIDOS'.center(50, '='))
-                        print(f'Se recibieron {len(self.datos_recibidos)} datos.')
+                        print(f'Se recibieron {len(self.datos_recibidos)} datos.'.center(50, '='))
                         self.socket.disconnect(f'tcp://{self.ip_server}:5000')
                 else:
                     self.cerrar_polled_socket()
@@ -76,13 +77,15 @@ class Esclavo:
                             "fila INTEGER, "
                             "pos_elemento INTEGER, "
                             "valor REAL, "
-                            "resultado REAL);")
+                            "resultado REAL, "
+                            "semilla REAL);")
         for tupla in self.datos_recibidos:
             self.cursor.execute("INSERT INTO datos(fila, "
                                 "pos_elemento, "
                                 "valor, "
-                                "resultado) "
-                                "VALUES (?, ?, ?, ?)",
+                                "resultado, "
+                                "semilla) "
+                                "VALUES (?, ?, ?, ?, ?)",
                                 tupla)
         self.conexion.commit()
 
