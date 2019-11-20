@@ -12,7 +12,7 @@ class Esclavo:
         self.contexto = zmq.Context()
         self.socket = None
         self.poll = zmq.Poller()
-        self.iniciar_contexto()
+        self.iniciar_polled_socket()
         self.conexion = sqlite3.connect('datos_esclavo.db')
         self.cursor = self.conexion.cursor()
         print('INICIO CORRECTO'.center(50, '='))
@@ -20,7 +20,7 @@ class Esclavo:
     def iniciar_polled_socket(self):
         self.socket = self.contexto.socket(zmq.REQ)
         self.socket.connect(f'tcp://{self.ip_server}:5000')
-        poll.register(self.socket, zmq.POLLIN)
+        self.poll.register(self.socket, zmq.POLLIN)
 
     def cerrar_polled_socket(self):
         self.socket.setsockopt(zmq.LINGER, 0) # Descartar de forma inmediata los mensajes
@@ -64,7 +64,7 @@ class Esclavo:
                         self.socket.disconnect(f'tcp://{self.ip_server}:5000')
                 else:
                     self.cerrar_polled_socket()
-                    self.inicar_polled_socket()
+                    self.iniciar_polled_socket()
                     self.socket.send_json({"mens": "disponible"})
 
 
@@ -123,20 +123,34 @@ class Esclavo:
                             respuesta = self.socket.recv_json()
                             if respuesta['mens'] == 'solucion RX':
                                 print("SOLUCION ENVIADA".center(50, '='))
-                            self.socket.disconnect(f'tcp://{self.ip_server}:5000')
+                                self.socket.disconnect(f'tcp://{self.ip_server}:5000')
+                                return
                 else:
                     self.cerrar_polled_socket()
-                    self.inicar_polled_socket()
+                    self.iniciar_polled_socket()
                     self.socket.send_json({'mens': 'solucion lista'})
 
 
 if __name__ == "__main__":
-    ip_servidor = input("Ingrese la IP del Servidor [localhost]: ")
-    if len(ip_servidor) == 0:
-        ip_servidor = 'localhost'
+    try:
+        ip_servidor = input("Ingrese la IP del Servidor [localhost]: ") or 'localhost'
+    except (KeyboardInterrupt, NameError):
+        print("Adios!")
+        exit(0)
     esclavo = Esclavo(ip_servidor)
     while True:
-        esclavo.recibir_datos()
-        esclavo.escribir_datos()
-        esclavo.calcular_solucion()
-        esclavo.enviar_solucion()
+        try:
+            esclavo.recibir_datos()
+            esclavo.escribir_datos()
+            esclavo.calcular_solucion()
+            esclavo.enviar_solucion()
+        except (zmq.ZMQError, KeyboardInterrupt) as e:
+            if e == zmq.ZMQError:
+                print("FALLA")
+                continue
+            else:
+                print("Cerrando elegantemente!")
+                esclavo.socket.disconnect(f'tcp://{esclavo.ip_server}:5000')
+                esclavo.cerrar_polled_socket()
+                print("Adios!")
+                exit()
