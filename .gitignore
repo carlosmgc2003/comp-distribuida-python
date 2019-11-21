@@ -1,5 +1,6 @@
 /venv
 /.idea
+/ejercicios
 *.txt
 *.db
 comp_distribuida

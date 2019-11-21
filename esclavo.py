@@ -2,6 +2,7 @@ import zmq
 import sqlite3
 from subprocess import run
 from time import perf_counter
+import os
 
 REQUEST_TIMEOUT = 2000
 
@@ -13,6 +14,10 @@ class Esclavo:
         self.socket = None
         self.poll = zmq.Poller()
         self.iniciar_polled_socket()
+        try:
+            os.remove('datos_esclavo.db')
+        except:
+            print("Error al eliminar la bd ", filePath)
         self.conexion = sqlite3.connect('datos_esclavo.db')
         self.cursor = self.conexion.cursor()
         print('INICIO CORRECTO'.center(50, '='))

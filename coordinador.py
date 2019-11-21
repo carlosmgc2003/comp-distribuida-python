@@ -6,7 +6,68 @@ from mpl_toolkits.mplot3d import Axes3D
 import matplotlib.pyplot as plt
 from matplotlib import cm
 import numpy as np
-from pprint import pprint
+from datetime import datetime
+
+
+class Lista_Trabajos(list):
+    def __init__(self, tam_batch, cant_filas, veces):
+        super().__init__()
+        self.tam_batch = tam_batch
+        self.cant_filas = cant_filas
+        self.veces = veces
+        self.generar_trabajos()
+        self.sort(key=lambda trab: trab.orden)
+
+    def generar_trabajos(self):
+        trabajos_totales = self.cant_filas // self.tam_batch
+        for i in range(trabajos_totales):
+            fila_inicial = i * self.tam_batch
+            fila_final = fila_inicial + self.tam_batch - 1
+            self.append(Trabajo(extremos=(fila_inicial, fila_final)))
+        cant_iniciales = len(self)
+        for _ in range(self.veces - 1):
+            for i in range(cant_iniciales):
+                self.append(Trabajo(extremos=self[i].extremos))
+
+    def get_trabajo_pendiente(self):
+        for trabajo in self:
+            if trabajo.estado == 'pendiente':
+                trabajo.estado = 'listo'
+                return trabajo
+        else:
+            return False
+
+
+class Trabajo:
+    static_orden = 0
+
+    @staticmethod
+    def incrementar_static_orden():
+        Trabajo.static_orden += 1
+
+    @staticmethod
+    def get_static_orden():
+        return Trabajo.static_orden
+
+    def __init__(self, extremos, estado='pendiente'):
+        self.extremos = extremos
+        self.estado = estado
+        self.orden = Trabajo.get_static_orden()
+        Trabajo.incrementar_static_orden()
+
+    def __getitem__(self, indice):
+        return self.extremos[indice]
+
+    def __eq__(self, other):
+        try:
+            assert isinstance(other, str)
+            return self.estado == other
+        except AssertionError:
+            print("Solo se puede comparar con un estado valido")
+
+    def __repr__(self):
+        return f'{self.orden}. {self.extremos}:{self.estado}'
+
 
 
 
@@ -21,7 +82,9 @@ class Servidor:
         self.socket = None
         self.respuesta = None
         self.solucion = []
-        self.lista_pendientes = self.calcular_trabajos()
+        self.lista_trabajos = Lista_Trabajos(self.tam_batch,
+                                             self.parser.cantidad_filas(),
+                                             self.veces)
         self.iniciar_comunicacion()
         self.mensaje_inicial()
 
@@ -32,13 +95,12 @@ class Servidor:
         self.parser.cursor.execute('SELECT COUNT(*) FROM resultados;')
         print(f'Cantidad de resultados (no nulos) = {self.parser.cursor.fetchone()[0]}'.center(50, '='))
         print("ARCHIVO DE DATOS ANALIZADO".center(50, '='))
-        print(f'Cantidad de trabajos: {len(self.calcular_trabajos())}'.center(50, '='))
+        print(f'Cantidad de trabajos: {len(self.lista_trabajos)}'.center(50, '='))
         print("Listo para escuchar".center(50, '='))
         self.escuchar()
 
     def mostrar_solucion(self):
         print("SOLUCION".center(50, '='))
-        pprint(self.solucion, compact=True)
         self.graficar_solucion()
 
     def iniciar_comunicacion(self):
@@ -46,16 +108,6 @@ class Servidor:
         self.socket = self.contexto.socket(zmq.REP)
         self.socket.bind('tcp://0.0.0.0:5000')
 
-    def calcular_trabajos(self):
-        """Genera una lista de duplas con los indices de inicio y fin de cada trabajo
-        que se entregará a los esclavos"""
-        trabajos_totales = self.parser.cantidad_filas() // self.tam_batch
-        lista_trabajos = []
-        for i in range(trabajos_totales):
-            fila_inicial = i * self.tam_batch
-            fila_final = fila_inicial + self.tam_batch
-            lista_trabajos.append((fila_inicial, fila_final))
-        return lista_trabajos
 
     def escuchar(self):
         """ MainLoop principal de la clase donde se debe volver despues de cada actividad concretada."""
@@ -69,7 +121,6 @@ class Servidor:
                 print("PASADA COMPLETADA".center(50, '!'))
                 if self.veces > 1:
                     self.solucion.clear()
-                    self.lista_pendientes = self.calcular_trabajos()
             self.veces -= 1
 
     def dirigir_entrantes(self):
@@ -77,22 +128,21 @@ class Servidor:
         if self.respuesta['mens'] == 'disponible':
             print("ENVIANDO TRABAJO".center(50, '='))
             # Hay un esclavo disponible para procesar, le enviamos trabajo y lo eliminamos de los pendientes
-            trabajo_a_despachar = self.lista_pendientes.pop()
-            enviado = self.enviar_trabajo(trabajo_a_despachar)
-            if not enviado:
-                self.lista_pendientes.append(trabajo_a_despachar)
+            trabajo_a_despachar = self.lista_trabajos.get_trabajo_pendiente()
+            if trabajo_a_despachar:
+                self.enviar_trabajo(trabajo_a_despachar)
         if self.respuesta['mens'] == 'solucion lista':
             print("RECIBIENDO SOLUCION".center(50, '='))
             self.recibir_solucion()
 
-    def enviar_trabajo(self, indices):
+    def enviar_trabajo(self, trabajo: Trabajo):
         """ Envia todos los datos de un trabajo a un esclavo
-        :keyword indices = tuple(indice_inicial, indice_final)"""
+        :keyword trabajo = tuple(indice_inicial, indice_final)"""
         self.socket.send_json({'mens': 'trabajo'})
-        primer_fila = indices[0]
-        ultima_fila = indices[1]
+        primer_fila = trabajo[0]
+        ultima_fila = trabajo[1]
         # Bucle de envio de filas
-        for nro_fila in range(primer_fila, ultima_fila):
+        for nro_fila in range(primer_fila, ultima_fila + 1):
             # Pido los datos a SQLITE
             self.parser.cursor.execute("SELECT triplas.fila, "
                                        "triplas.pos_elemento, "
@@ -124,6 +174,7 @@ class Servidor:
             if respuesta['mens'] == 'fila RX':
                 self.socket.send_json({'mens': 'fin trabajo'})
                 print("TRABAJO ENVIADO".center(50, '='))
+                trabajo.estado = 'enviado'
                 return True
         return False
 
@@ -145,19 +196,23 @@ class Servidor:
         print("SOLUCION RECIBIDA".center(50, '='))
 
     def graficar_solucion(self):
+        self.diferencia = None
         fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
-        x = np.arange(0, 40)
-        y = np.arange(0, 40)
+        dim = int(self.parser.cantidad_filas() ** 0.5)
+        x = np.arange(0, dim)
+        y = np.arange(0, dim)
         x, y = np.meshgrid(x, y)
-        z = np.array([item[1] for item in self.solucion]).reshape((40, 40))
+        z = np.array([item[1] for item in self.solucion]).reshape((dim, dim))
         z = np.rot90(z)
+        fecha = datetime.now()
+        np.save(f'respuesta-{fecha}', z)
+        self.diferencia = z
         ax.plot_surface(x, y, z, cmap=cm.coolwarm, linewidth=0, antialiased=False)
-        plt.title(f'Gráfico de solución para tamaño de batch de {self.tam_batch}')
+        plt.title(f'Gráfico de solución para tamaño de batch de {self.tam_batch}, {self.lista_trabajos.veces} veces')
         plt.show()
 
 
-
 if __name__ == "__main__":
-    app = Servidor(veces=3, tam_batch=400, vector_result='vector.txt', matriz='matriz.txt')
+    app = Servidor(veces=1, tam_batch=1600, vector_result='./ejercicios/vector.txt', matriz='./ejercicios/matriz.txt')
     app.mostrar_solucion()
