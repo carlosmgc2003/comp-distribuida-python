@@ -4,3 +4,6 @@
 *.txt
 *.db
 comp_distribuida
+__pycache__/analizador.cpython-37.pyc
+datos_coordinador.db-journal
+*.npy

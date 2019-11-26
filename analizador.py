@@ -76,7 +76,7 @@ class AnalizaArchivos:
 
     def actualizar_semilla(self, lista_semillas):
         for indice, semilla in enumerate(lista_semillas):
-            self.cursor.execute("UPDATE semilla SET valor_semilla = ? WHERE variable = ?;", (semilla[1], semilla[0]))
+            self.cursor.execute("UPDATE semilla SET valor_semilla = ? WHERE variable = ?;", (semilla[1], semilla[0] + 1))
             if indice % 50 == 0:
                 self.db.commit()
         else:
