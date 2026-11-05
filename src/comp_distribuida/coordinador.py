@@ -110,7 +110,9 @@ class Coordinador:
             config.tam_bloque,
         )
         if not problema.es_diagonal_dominante():
-            log.warning("A no es diagonal dominante: Jacobi podría no converger")
+            log.warning(
+                "A no es diagonal dominante (encadenada): no está garantizado que Jacobi converja"
+            )
 
     # --- ciclo de vida ------------------------------------------------------------
 

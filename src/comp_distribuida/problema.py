@@ -84,10 +84,44 @@ class Problema:
         return float(np.linalg.norm(self.b - self.A @ x)) / norma_b
 
     def es_diagonal_dominante(self) -> bool:
-        """Condición suficiente (no necesaria) para que Jacobi converja."""
-        diagonal = np.abs(self.A.diagonal())
-        suma_fila = np.asarray(abs(self.A).sum(axis=1)).ravel() - diagonal
-        return bool(np.all(diagonal >= suma_fila) and np.any(diagonal > suma_fila))
+        """Dominancia diagonal débil *encadenada*: condición suficiente para que Jacobi converja.
+
+        Se cumple si:
+
+        1. ``|a_ii| >= Σ_{j≠i} |a_ij|`` en todas las filas (dominancia débil), y
+        2. desde cada fila ``i`` hay un camino ``i → j → … → k`` en el grafo de A
+           (arista ``i → j`` si ``a_ij ≠ 0``) que termina en una fila ``k``
+           estrictamente dominante.
+
+        Con eso ``ρ(|D⁻¹(D − A)|) < 1`` (las filas de ``|J|ᵖ`` suman < 1 para p
+        grande), A es una H-matriz y convergen Jacobi puntual, Jacobi por
+        bloques con cualquier partición, la variante en dos etapas y la asíncrona.
+
+        Pedir sólo "débil en todas y estricta en alguna" NO alcanza: la matriz
+        ``[[1, -1, 0], [-1, 1, 0], [0, 0, 2]]`` lo cumple, es singular y Jacobi no
+        converge. La placa de Laplace es justamente débil en las filas interiores
+        y estricta sólo en el borde: lo que garantiza la convergencia es que la
+        grilla es conexa (irreducible), y eso es lo que mide el punto 2.
+        Ver ``docs/matematica.md``.
+        """
+        A = abs(self.A).tocsr()
+        A.eliminate_zeros()
+        diagonal = A.diagonal()
+        fuera = np.asarray(A.sum(axis=1)).ravel() - diagonal
+        if np.any(diagonal == 0) or np.any(diagonal < fuera):
+            return False
+        # Búsqueda hacia atrás desde las filas estrictas: la fila i "llega" si
+        # a_ij ≠ 0 para alguna j que ya llega. Las filas i con a_ij ≠ 0 son los
+        # índices de la fila j de Aᵀ.
+        llega = diagonal > fuera
+        frontera = np.flatnonzero(llega)
+        AT = A.T.tocsr()
+        while frontera.size:
+            candidatas = np.unique(AT[frontera].indices)
+            nuevas = candidatas[~llega[candidatas]]
+            llega[nuevas] = True
+            frontera = nuevas
+        return bool(llega.all())
 
 
 # --- Lectura / escritura ----------------------------------------------------------

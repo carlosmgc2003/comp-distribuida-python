@@ -1,0 +1,306 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 1874" width="1000" height="1874" role="img" aria-labelledby="titulo desc">
+<title id="titulo">Jacobi por bloques distribuido: por qué funciona</title>
+<desc id="desc">Infografía: el problema de la placa repartido en franjas, la matriz A = M − N, una ronda coordinador-esclavos, la cadena M-matriz, splitting regular y ρ menor que 1, el efecto del tamaño de bloque y de los barridos internos, y cómo acelerar con SOR o gradiente conjugado.</desc>
+<style>
+svg{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif}
+.root{--bg:#f4f3ef;--card:#fcfcfb;--line:#e2e0d8;--ink:#0b0b0b;--ink2:#52514e;--ink3:#6f6e69;
+ --s1:#2a78d6;--s2:#eb6834;--s3:#1baf7a;--s4:#eda100;--bar:#2a78d6;--acople:#c9c7bd;--vacio:#efeee9;
+ --warnbg:#fff4dc;--cellop:.3;--warn:#fab219;--hot:#d03b3b;--box:#f4f3ef}
+@media (prefers-color-scheme:dark){.root{--bg:#121211;--card:#1a1a19;--line:#33332f;--ink:#f0efec;--ink2:#c3c2b7;--ink3:#a3a29a;
+ --s1:#3987e5;--s2:#d95926;--s3:#199e70;--s4:#c98500;--bar:#3987e5;--acople:#5a5953;--vacio:#262624;
+ --warnbg:#3a2f12;--cellop:.5;--warn:#fab219;--hot:#e66767;--box:#232322}}
+.bgr{fill:var(--bg)} .card{fill:var(--card);stroke:var(--line)} .box{fill:var(--box);stroke:var(--line)}
+.num{fill:var(--s1)} .numt{fill:#fff;font-size:15px;font-weight:700}
+.h1{fill:var(--ink);font-size:30px;font-weight:700} .sub{fill:var(--ink2);font-size:15px}
+.h2{fill:var(--ink);font-size:19px;font-weight:650} .h3{fill:var(--ink);font-size:15px;font-weight:650}
+.b{fill:var(--ink);font-size:14.5px} .muted{fill:var(--ink2);font-size:14px} .small{fill:var(--ink2);font-size:13px}
+.lab{fill:var(--ink);font-size:13.5px} .tiny{fill:var(--ink3);font-size:12px} .tinyv{fill:var(--ink2);font-size:11.5px}
+.val{fill:var(--ink2);font-size:13px;font-variant-numeric:tabular-nums}
+.onfill{fill:#fff;font-size:13px;font-weight:650} .onfilld{fill:#0b0b0b;font-size:13px;font-weight:650}
+.s1{fill:var(--s1)} .s2{fill:var(--s2)} .s3{fill:var(--s3)} .s4{fill:var(--s4)} .cell{opacity:var(--cellop)}
+.sten{fill:none;stroke:var(--ink);stroke-width:2} .stenc{fill:var(--ink);opacity:.85}
+.acople{fill:var(--acople)} .vacio{fill:var(--vacio)} .bar{fill:var(--bar)}
+.hot{stroke:var(--hot);stroke-width:4;stroke-linecap:round}
+.axis{stroke:var(--ink3);stroke-width:1} .arrow{stroke:var(--ink2);stroke-width:2}
+.warn{fill:var(--warnbg);stroke:var(--warn)} .warnicon{fill:var(--warn)} .warnmark{fill:#0b0b0b;font-size:14px;font-weight:800}
+#punta path{fill:var(--ink2)}
+</style>
+<g class="root"><defs><marker id="punta" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z"/></marker></defs><rect class="bgr" width="1000" height="1874"/>
+<text x="40" y="62" class="h1" text-anchor="start" >Jacobi por bloques distribuido: por qué funciona</text>
+<text x="40" y="92" class="sub" text-anchor="start" >Placa de Laplace 40×40 (n = 1 600 incógnitas), 4 bloques de 400 filas, tolerancia ‖b − A·x‖/‖b‖ ≤ 10<tspan dy="-6" font-size="72%">−8</tspan><tspan dy="6">​</tspan></text>
+<rect x="30" y="120" width="460" height="380" rx="14" class="card" />
+<circle cx="60" cy="152" r="14" class="num"/>
+<text x="60" y="157" class="numt" text-anchor="middle" >1</text>
+<text x="84" y="158" class="h2" text-anchor="start" >El problema: una placa, cuatro esclavos</text>
+<line x1="70" y1="212" x2="278" y2="212" class="hot"/>
+<text x="174.0" y="204" class="small" text-anchor="middle" >borde superior a 100°</text>
+<rect x="71" y="221" width="24" height="24" rx="3" class="s1 cell" />
+<rect x="97" y="221" width="24" height="24" rx="3" class="s1 cell" />
+<rect x="123" y="221" width="24" height="24" rx="3" class="s1 cell" />
+<rect x="149" y="221" width="24" height="24" rx="3" class="s1 cell" />
+<rect x="175" y="221" width="24" height="24" rx="3" class="s1 cell" />
+<rect x="201" y="221" width="24" height="24" rx="3" class="s1 cell" />
+<rect x="227" y="221" width="24" height="24" rx="3" class="s1 cell" />
+<rect x="253" y="221" width="24" height="24" rx="3" class="s1 cell" />
+<rect x="71" y="247" width="24" height="24" rx="3" class="s1 cell" />
+<rect x="97" y="247" width="24" height="24" rx="3" class="s1 cell" />
+<rect x="123" y="247" width="24" height="24" rx="3" class="s1 cell" />
+<rect x="149" y="247" width="24" height="24" rx="3" class="s1 cell" />
+<rect x="175" y="247" width="24" height="24" rx="3" class="s1 cell" />
+<rect x="201" y="247" width="24" height="24" rx="3" class="s1 cell" />
+<rect x="227" y="247" width="24" height="24" rx="3" class="s1 cell" />
+<rect x="253" y="247" width="24" height="24" rx="3" class="s1 cell" />
+<rect x="71" y="273" width="24" height="24" rx="3" class="s2 cell" />
+<rect x="97" y="273" width="24" height="24" rx="3" class="s2 cell" />
+<rect x="123" y="273" width="24" height="24" rx="3" class="s2 cell" />
+<rect x="149" y="273" width="24" height="24" rx="3" class="s2 cell" />
+<rect x="175" y="273" width="24" height="24" rx="3" class="s2 cell" />
+<rect x="201" y="273" width="24" height="24" rx="3" class="s2 cell" />
+<rect x="227" y="273" width="24" height="24" rx="3" class="s2 cell" />
+<rect x="253" y="273" width="24" height="24" rx="3" class="s2 cell" />
+<rect x="71" y="299" width="24" height="24" rx="3" class="s2 cell" />
+<rect x="97" y="299" width="24" height="24" rx="3" class="s2 cell" />
+<rect x="123" y="299" width="24" height="24" rx="3" class="s2 cell" />
+<rect x="149" y="299" width="24" height="24" rx="3" class="s2 cell" />
+<rect x="175" y="299" width="24" height="24" rx="3" class="s2 cell" />
+<rect x="201" y="299" width="24" height="24" rx="3" class="s2 cell" />
+<rect x="227" y="299" width="24" height="24" rx="3" class="s2 cell" />
+<rect x="253" y="299" width="24" height="24" rx="3" class="s2 cell" />
+<rect x="71" y="325" width="24" height="24" rx="3" class="s3 cell" />
+<rect x="97" y="325" width="24" height="24" rx="3" class="s3 cell" />
+<rect x="123" y="325" width="24" height="24" rx="3" class="s3 cell" />
+<rect x="149" y="325" width="24" height="24" rx="3" class="s3 cell" />
+<rect x="175" y="325" width="24" height="24" rx="3" class="s3 cell" />
+<rect x="201" y="325" width="24" height="24" rx="3" class="s3 cell" />
+<rect x="227" y="325" width="24" height="24" rx="3" class="s3 cell" />
+<rect x="253" y="325" width="24" height="24" rx="3" class="s3 cell" />
+<rect x="71" y="351" width="24" height="24" rx="3" class="s3 cell" />
+<rect x="97" y="351" width="24" height="24" rx="3" class="s3 cell" />
+<rect x="123" y="351" width="24" height="24" rx="3" class="s3 cell" />
+<rect x="149" y="351" width="24" height="24" rx="3" class="s3 cell" />
+<rect x="175" y="351" width="24" height="24" rx="3" class="s3 cell" />
+<rect x="201" y="351" width="24" height="24" rx="3" class="s3 cell" />
+<rect x="227" y="351" width="24" height="24" rx="3" class="s3 cell" />
+<rect x="253" y="351" width="24" height="24" rx="3" class="s3 cell" />
+<rect x="71" y="377" width="24" height="24" rx="3" class="s4 cell" />
+<rect x="97" y="377" width="24" height="24" rx="3" class="s4 cell" />
+<rect x="123" y="377" width="24" height="24" rx="3" class="s4 cell" />
+<rect x="149" y="377" width="24" height="24" rx="3" class="s4 cell" />
+<rect x="175" y="377" width="24" height="24" rx="3" class="s4 cell" />
+<rect x="201" y="377" width="24" height="24" rx="3" class="s4 cell" />
+<rect x="227" y="377" width="24" height="24" rx="3" class="s4 cell" />
+<rect x="253" y="377" width="24" height="24" rx="3" class="s4 cell" />
+<rect x="71" y="403" width="24" height="24" rx="3" class="s4 cell" />
+<rect x="97" y="403" width="24" height="24" rx="3" class="s4 cell" />
+<rect x="123" y="403" width="24" height="24" rx="3" class="s4 cell" />
+<rect x="149" y="403" width="24" height="24" rx="3" class="s4 cell" />
+<rect x="175" y="403" width="24" height="24" rx="3" class="s4 cell" />
+<rect x="201" y="403" width="24" height="24" rx="3" class="s4 cell" />
+<rect x="227" y="403" width="24" height="24" rx="3" class="s4 cell" />
+<rect x="253" y="403" width="24" height="24" rx="3" class="s4 cell" />
+<rect x="175" y="299" width="24" height="24" rx="3" class="stenc" />
+<rect x="175" y="273" width="24" height="24" rx="3" class="sten" />
+<rect x="175" y="325" width="24" height="24" rx="3" class="sten" />
+<rect x="149" y="299" width="24" height="24" rx="3" class="sten" />
+<rect x="201" y="299" width="24" height="24" rx="3" class="sten" />
+<text x="292" y="251" class="lab" text-anchor="start" >esclavo 1</text>
+<rect x="362" y="240" width="10" height="10" rx="2" class="s1"/>
+<text x="292" y="303" class="lab" text-anchor="start" >esclavo 2</text>
+<rect x="362" y="292" width="10" height="10" rx="2" class="s2"/>
+<text x="292" y="355" class="lab" text-anchor="start" >esclavo 3</text>
+<rect x="362" y="344" width="10" height="10" rx="2" class="s3"/>
+<text x="292" y="407" class="lab" text-anchor="start" >esclavo 4</text>
+<rect x="362" y="396" width="10" height="10" rx="2" class="s4"/>
+<text x="60" y="460" class="b" text-anchor="start" >Cada celda: 4·x<tspan dy="4" font-size="72%">c</tspan><tspan dy="-4">​</tspan> − x<tspan dy="4" font-size="72%">N</tspan><tspan dy="-4">​</tspan> − x<tspan dy="4" font-size="72%">S</tspan><tspan dy="-4">​</tspan> − x<tspan dy="4" font-size="72%">E</tspan><tspan dy="-4">​</tspan> − x<tspan dy="4" font-size="72%">O</tspan><tspan dy="-4">​</tspan> = b<tspan dy="4" font-size="72%">c</tspan><tspan dy="-4">​</tspan>  (5 puntos)</text>
+<text x="60" y="482" class="muted" text-anchor="start" >Cada esclavo recibe una franja de filas consecutivas de A.</text>
+<rect x="510" y="120" width="460" height="380" rx="14" class="card" />
+<circle cx="540" cy="152" r="14" class="num"/>
+<text x="540" y="157" class="numt" text-anchor="middle" >2</text>
+<text x="564" y="158" class="h2" text-anchor="start" >La matriz: A = M − N</text>
+<rect x="562" y="202" width="48" height="48" rx="4" class="s1" />
+<text x="586.0" y="231.0" class="onfill" text-anchor="middle" >A<tspan dy="4" font-size="72%">11</tspan><tspan dy="-4">​</tspan></text>
+<rect x="614" y="202" width="48" height="48" rx="4" class="acople" />
+<rect x="666" y="202" width="48" height="48" rx="4" class="vacio" />
+<rect x="718" y="202" width="48" height="48" rx="4" class="vacio" />
+<rect x="562" y="254" width="48" height="48" rx="4" class="acople" />
+<rect x="614" y="254" width="48" height="48" rx="4" class="s2" />
+<text x="638.0" y="283.0" class="onfill" text-anchor="middle" >A<tspan dy="4" font-size="72%">22</tspan><tspan dy="-4">​</tspan></text>
+<rect x="666" y="254" width="48" height="48" rx="4" class="acople" />
+<rect x="718" y="254" width="48" height="48" rx="4" class="vacio" />
+<rect x="562" y="306" width="48" height="48" rx="4" class="vacio" />
+<rect x="614" y="306" width="48" height="48" rx="4" class="acople" />
+<rect x="666" y="306" width="48" height="48" rx="4" class="s3" />
+<text x="690.0" y="335.0" class="onfilld" text-anchor="middle" >A<tspan dy="4" font-size="72%">33</tspan><tspan dy="-4">​</tspan></text>
+<rect x="718" y="306" width="48" height="48" rx="4" class="acople" />
+<rect x="562" y="358" width="48" height="48" rx="4" class="vacio" />
+<rect x="614" y="358" width="48" height="48" rx="4" class="vacio" />
+<rect x="666" y="358" width="48" height="48" rx="4" class="acople" />
+<rect x="718" y="358" width="48" height="48" rx="4" class="s4" />
+<text x="742.0" y="387.0" class="onfilld" text-anchor="middle" >A<tspan dy="4" font-size="72%">44</tspan><tspan dy="-4">​</tspan></text>
+<rect x="792" y="206" width="6" height="6" rx="1" class="s1" />
+<rect x="800" y="206" width="6" height="6" rx="1" class="s2" />
+<rect x="792" y="214" width="6" height="6" rx="1" class="s3" />
+<rect x="800" y="214" width="6" height="6" rx="1" class="s4" />
+<text x="814" y="218" class="b" text-anchor="start" >M = diag(A<tspan dy="4" font-size="72%">BB</tspan><tspan dy="-4">​</tspan>)</text>
+<text x="814" y="238" class="muted" text-anchor="start" >lo que resuelve</text>
+<text x="814" y="256" class="muted" text-anchor="start" >cada esclavo</text>
+<rect x="792" y="286" width="14" height="14" rx="3" class="acople" />
+<text x="814" y="298" class="b" text-anchor="start" >−N = acoples</text>
+<text x="814" y="318" class="muted" text-anchor="start" >entre franjas</text>
+<rect x="792" y="348" width="14" height="14" rx="3" class="vacio" />
+<text x="814" y="360" class="b" text-anchor="start" >ceros</text>
+<text x="540" y="438" class="b" text-anchor="start" >Franjas ⇒ A es tridiagonal por bloques:</text>
+<text x="540" y="460" class="muted" text-anchor="start" >cada bloque sólo ve al anterior y al siguiente.</text>
+<text x="540" y="482" class="muted" text-anchor="start" >(Eso habilita la aceleración de la sección 7.)</text>
+<rect x="30" y="520" width="940" height="230" rx="14" class="card" />
+<circle cx="60" cy="552" r="14" class="num"/>
+<text x="60" y="557" class="numt" text-anchor="middle" >3</text>
+<text x="84" y="558" class="h2" text-anchor="start" >Una ronda (iteración externa k)</text>
+<rect x="60" y="582" width="260" height="96" rx="10" class="box" />
+<text x="76" y="608" class="h3" text-anchor="start" >Coordinador</text>
+<text x="76" y="634" class="b" text-anchor="start" >envía x<tspan dy="-6" font-size="72%">k</tspan><tspan dy="6">​</tspan> a cada</text>
+<text x="76" y="656" class="b" text-anchor="start" >esclavo libre</text>
+<rect x="360" y="582" width="260" height="96" rx="10" class="box" />
+<text x="376" y="608" class="h3" text-anchor="start" >Esclavo B (núcleo C++)</text>
+<text x="376" y="634" class="b" text-anchor="start" >A<tspan dy="4" font-size="72%">BB</tspan><tspan dy="-4">​</tspan>·x<tspan dy="4" font-size="72%">B</tspan><tspan dy="-4">​</tspan> = b<tspan dy="4" font-size="72%">B</tspan><tspan dy="-4">​</tspan> − A<tspan dy="4" font-size="72%">B,ext</tspan><tspan dy="-4">​</tspan>·x<tspan dy="4" font-size="72%">ext</tspan><tspan dy="-4">​</tspan><tspan dy="-6" font-size="72%">k</tspan><tspan dy="6">​</tspan></text>
+<text x="376" y="656" class="b" text-anchor="start" >m barridos de Jacobi</text>
+<rect x="680" y="582" width="260" height="96" rx="10" class="box" />
+<text x="696" y="608" class="h3" text-anchor="start" >Coordinador</text>
+<text x="696" y="634" class="b" text-anchor="start" >junta x<tspan dy="-6" font-size="72%">k+1</tspan><tspan dy="6">​</tspan>; para si</text>
+<text x="696" y="656" class="b" text-anchor="start" >‖b − A·x<tspan dy="-6" font-size="72%">k+1</tspan><tspan dy="6">​</tspan>‖/‖b‖ ≤ tol</text>
+<line x1="322" y1="630" x2="354" y2="630" class="arrow" marker-end="url(#punta)"/>
+<line x1="642" y1="630" x2="674" y2="630" class="arrow" marker-end="url(#punta)"/>
+<path d="M810,680 v18 h-680 v-14" class="arrow" fill="none" marker-end="url(#punta)"/>
+<text x="470" y="716" class="muted" text-anchor="middle" >k ← k + 1</text>
+<text x="60" y="734" class="b" text-anchor="start" >Error: e<tspan dy="-6" font-size="72%">k+1</tspan><tspan dy="6">​</tspan> = (M<tspan dy="-6" font-size="72%">−1</tspan><tspan dy="6">​</tspan>N)·e<tspan dy="-6" font-size="72%">k</tspan><tspan dy="6">​</tspan>  ⇒  converge para todo x<tspan dy="-6" font-size="72%">0</tspan><tspan dy="6">​</tspan> si y sólo si ρ(M<tspan dy="-6" font-size="72%">−1</tspan><tspan dy="6">​</tspan>N) &lt; 1;  rondas ≈ ln(tol) / ln ρ</text>
+<rect x="30" y="770" width="940" height="290" rx="14" class="card" />
+<circle cx="60" cy="802" r="14" class="num"/>
+<text x="60" y="807" class="numt" text-anchor="middle" >4</text>
+<text x="84" y="808" class="h2" text-anchor="start" >Por qué ρ(M<tspan dy="-6" font-size="72%">−1</tspan><tspan dy="6">​</tspan>N) &lt; 1: la cadena de teoremas</text>
+<rect x="60" y="832" width="200" height="120" rx="10" class="box" />
+<text x="74" y="858" class="h3" text-anchor="start" >La placa cumple</text>
+<text x="74" y="884" class="small" text-anchor="start" >Z-matriz: a<tspan dy="4" font-size="72%">ij</tspan><tspan dy="-4">​</tspan> ≤ 0</text>
+<text x="74" y="905" class="small" text-anchor="start" >débil: 4 ≥ 1+1+1+1</text>
+<text x="74" y="926" class="small" text-anchor="start" >irreducible: grilla conexa</text>
+<line x1="262" y1="892" x2="282" y2="892" class="arrow" marker-end="url(#punta)"/>
+<rect x="285" y="832" width="200" height="120" rx="10" class="box" />
+<text x="299" y="858" class="h3" text-anchor="start" >⇒ M-matriz</text>
+<text x="299" y="884" class="small" text-anchor="start" >A<tspan dy="-6" font-size="72%">−1</tspan><tspan dy="6">​</tspan> ≥ 0 elemento a elemento</text>
+<text x="299" y="905" class="small" text-anchor="start" >simétrica ⇒ definida positiva</text>
+<text x="299" y="926" class="small" text-anchor="start" >(Varga)</text>
+<line x1="487" y1="892" x2="507" y2="892" class="arrow" marker-end="url(#punta)"/>
+<rect x="510" y="832" width="200" height="120" rx="10" class="box" />
+<text x="524" y="858" class="h3" text-anchor="start" >⇒ Splitting regular</text>
+<text x="524" y="884" class="small" text-anchor="start" >M = diag(A<tspan dy="4" font-size="72%">BB</tspan><tspan dy="-4">​</tspan>): M<tspan dy="-6" font-size="72%">−1</tspan><tspan dy="6">​</tspan> ≥ 0</text>
+<text x="524" y="905" class="small" text-anchor="start" >N = acoples cambiados</text>
+<text x="524" y="926" class="small" text-anchor="start" >de signo: N ≥ 0</text>
+<line x1="712" y1="892" x2="732" y2="892" class="arrow" marker-end="url(#punta)"/>
+<rect x="735" y="832" width="200" height="120" rx="10" class="box" />
+<text x="749" y="858" class="h3" text-anchor="start" >⇒ Converge</text>
+<text x="749" y="884" class="small" text-anchor="start" >ρ(M<tspan dy="-6" font-size="72%">−1</tspan><tspan dy="6">​</tspan>N) &lt; 1 con cualquier</text>
+<text x="749" y="905" class="small" text-anchor="start" >partición; bloques más</text>
+<text x="749" y="926" class="small" text-anchor="start" >grandes ⇒ ρ menor</text>
+<rect x="60" y="970" width="880" height="66" rx="10" class="warn" />
+<path d="M84,1014 l12,-22 l12,22 z" class="warnicon"/>
+<text x="96" y="1011" class="warnmark" text-anchor="middle" >!</text>
+<text x="122" y="996" class="h3" text-anchor="start" >Atención: la dominancia débil sola no alcanza; hace falta la irreducibilidad.</text>
+<text x="122" y="1020" class="small" text-anchor="start" >[[1,−1,0],[−1,1,0],[0,0,2]] es débil con una fila estricta y es singular. es_diagonal_dominante() ahora lo verifica.</text>
+<rect x="30" y="1080" width="460" height="330" rx="14" class="card" />
+<circle cx="60" cy="1112" r="14" class="num"/>
+<text x="60" y="1117" class="numt" text-anchor="middle" >5</text>
+<text x="84" y="1118" class="h2" text-anchor="start" >Bloques más grandes, menos rondas</text>
+<text x="60" y="1150" class="muted" text-anchor="start" >rondas estimadas ≈ ln(10<tspan dy="-6" font-size="72%">−8</tspan><tspan dy="6">​</tspan>) / ln ρ</text>
+<text x="60" y="1188" class="lab" text-anchor="start" >Jacobi puntual</text>
+<text x="60" y="1206" class="tiny" text-anchor="start" >ρ = 0,99707</text>
+<path d="M190,1176 h196.0 a4,4 0 0 1 4,4 v14 a4,4 0 0 1 -4,4 h-196.0 z" class="bar"><title>Jacobi puntual: ρ = 0.99707, ~6269 rondas</title></path>
+<text x="398.0" y="1192" class="val" text-anchor="start" >6 269</text>
+<text x="60" y="1232" class="lab" text-anchor="start" >16 bloques</text>
+<text x="60" y="1250" class="tiny" text-anchor="start" >ρ = 0,98586</text>
+<path d="M190,1220 h37.28250119636306 a4,4 0 0 1 4,4 v14 a4,4 0 0 1 -4,4 h-37.28250119636306 z" class="bar"><title>16 bloques: ρ = 0.98586, ~1294 rondas</title></path>
+<text x="239.28250119636306" y="1236" class="val" text-anchor="start" >1 294</text>
+<text x="60" y="1276" class="lab" text-anchor="start" >8 bloques</text>
+<text x="60" y="1294" class="tiny" text-anchor="start" >ρ = 0,97171</text>
+<path d="M190,1264 h16.481735524007018 a4,4 0 0 1 4,4 v14 a4,4 0 0 1 -4,4 h-16.481735524007018 z" class="bar"><title>8 bloques: ρ = 0.97171, ~642 rondas</title></path>
+<text x="218.481735524007" y="1280" class="val" text-anchor="start" >642</text>
+<text x="60" y="1320" class="lab" text-anchor="start" >4 bloques (hoy)</text>
+<text x="60" y="1338" class="tiny" text-anchor="start" >ρ = 0,94780</text>
+<path d="M190,1308 h6.974637103206254 a4,4 0 0 1 4,4 v14 a4,4 0 0 1 -4,4 h-6.974637103206254 z" class="bar"><title>4 bloques (hoy): ρ = 0.9478, ~344 rondas</title></path>
+<text x="208.97463710320625" y="1324" class="val" text-anchor="start" >344</text>
+<text x="60" y="1364" class="lab" text-anchor="start" >2 bloques</text>
+<text x="60" y="1382" class="tiny" text-anchor="start" >ρ = 0,91987</text>
+<path d="M190,1352 h3.52528313925666 a3.52528313925666,3.52528313925666 0 0 1 3.52528313925666,3.52528313925666 v14.949433721486681 a3.52528313925666,3.52528313925666 0 0 1 -3.52528313925666,3.52528313925666 h-3.52528313925666 z" class="bar"><title>2 bloques: ρ = 0.91987, ~221 rondas</title></path>
+<text x="205.05056627851332" y="1368" class="val" text-anchor="start" >221</text>
+<line x1="190" y1="1170" x2="190" y2="1392" class="axis"/>
+<rect x="510" y="1080" width="460" height="330" rx="14" class="card" />
+<circle cx="540" cy="1112" r="14" class="num"/>
+<text x="540" y="1117" class="numt" text-anchor="middle" >6</text>
+<text x="564" y="1118" class="h2" text-anchor="start" >¿Cuántos barridos internos (m)?</text>
+<text x="540" y="1150" class="tiny" text-anchor="start" >T<tspan dy="4" font-size="72%">m</tspan><tspan dy="-4">​</tspan> = P<tspan dy="-6" font-size="72%">m</tspan><tspan dy="6">​</tspan> + (I − P<tspan dy="-6" font-size="72%">m</tspan><tspan dy="6">​</tspan>)·M<tspan dy="-6" font-size="72%">−1</tspan><tspan dy="6">​</tspan>N:  m = 1 es Jacobi puntual, m → ∞ por bloques</text>
+<text x="548" y="1184" class="lab" text-anchor="start" >rondas (red)</text>
+<line x1="548" y1="1350" x2="738" y2="1350" class="axis"/>
+<path d="M554,1350 v-126.0 a4,4 0 0 1 4,-4 h12 a4,4 0 0 1 4,4 v126.0 z" class="bar"><title>m = 1: 4849 rondas</title></path>
+<text x="564" y="1366" class="tiny" text-anchor="middle" >1</text>
+<text x="564" y="1214.0" class="tinyv" text-anchor="middle" >4 849</text>
+<path d="M585,1350 v-25.43699731903485 a4,4 0 0 1 4,-4 h12 a4,4 0 0 1 4,4 v25.43699731903485 z" class="bar"><title>m = 5: 1098 rondas</title></path>
+<text x="595" y="1366" class="tiny" text-anchor="middle" >5</text>
+<path d="M616,1350 v-13.319034852546917 a4,4 0 0 1 4,-4 h12 a4,4 0 0 1 4,4 v13.319034852546917 z" class="bar"><title>m = 10: 646 rondas</title></path>
+<text x="626" y="1366" class="tiny" text-anchor="middle" >10</text>
+<path d="M647,1350 v-7.6353887399463805 a4,4 0 0 1 4,-4 h12 a4,4 0 0 1 4,4 v7.6353887399463805 z" class="bar"><title>m = 20: 434 rondas</title></path>
+<text x="657" y="1366" class="tiny" text-anchor="middle" >20</text>
+<path d="M678,1350 v-3.8605898123324396 a3.8605898123324396,3.8605898123324396 0 0 1 3.8605898123324396,-3.8605898123324396 h12.27882037533512 a3.8605898123324396,3.8605898123324396 0 0 1 3.8605898123324396,3.8605898123324396 v3.8605898123324396 z" class="bar"><title>m = 100: 288 rondas</title></path>
+<text x="688" y="1366" class="tiny" text-anchor="middle" >100</text>
+<path d="M709,1350 v-3.806970509383378 a3.806970509383378,3.806970509383378 0 0 1 3.806970509383378,-3.806970509383378 h12.386058981233244 a3.806970509383378,3.806970509383378 0 0 1 3.806970509383378,3.806970509383378 v3.806970509383378 z" class="bar"><title>m = 500: 284 rondas</title></path>
+<text x="719" y="1366" class="tiny" text-anchor="middle" >500</text>
+<text x="719" y="1336.3860589812332" class="tinyv" text-anchor="middle" >284</text>
+<text x="762" y="1184" class="lab" text-anchor="start" >barridos (CPU)</text>
+<line x1="762" y1="1350" x2="952" y2="1350" class="axis"/>
+<path d="M768,1350 v-6.188785983287268 a4,4 0 0 1 4,-4 h12 a4,4 0 0 1 4,4 v6.188785983287268 z" class="bar"><title>m = 1: 9698 barridos</title></path>
+<text x="778" y="1366" class="tiny" text-anchor="middle" >1</text>
+<path d="M799,1350 v-3.460699219318237 a3.460699219318237,3.460699219318237 0 0 1 3.460699219318237,-3.460699219318237 h13.078601561363527 a3.460699219318237,3.460699219318237 0 0 1 3.460699219318237,3.460699219318237 v3.460699219318237 z" class="bar"><title>m = 5: 6588 barridos</title></path>
+<text x="809" y="1366" class="tiny" text-anchor="middle" >5</text>
+<text x="809" y="1337.0786015613635" class="tinyv" text-anchor="middle" >6 588</text>
+<path d="M830,1350 v-3.732806413551213 a3.732806413551213,3.732806413551213 0 0 1 3.732806413551213,-3.732806413551213 h12.534387172897574 a3.732806413551213,3.732806413551213 0 0 1 3.732806413551213,3.732806413551213 v3.732806413551213 z" class="bar"><title>m = 10: 7106 barridos</title></path>
+<text x="840" y="1366" class="tiny" text-anchor="middle" >10</text>
+<path d="M861,1350 v-5.575231537603646 a4,4 0 0 1 4,-4 h12 a4,4 0 0 1 4,4 v5.575231537603646 z" class="bar"><title>m = 20: 9114 barridos</title></path>
+<text x="871" y="1366" class="tiny" text-anchor="middle" >20</text>
+<path d="M892,1350 v-26.56005430829656 a4,4 0 0 1 4,-4 h12 a4,4 0 0 1 4,4 v26.56005430829656 z" class="bar"><title>m = 100: 29088 barridos</title></path>
+<text x="902" y="1366" class="tiny" text-anchor="middle" >100</text>
+<path d="M923,1350 v-126.0 a4,4 0 0 1 4,-4 h12 a4,4 0 0 1 4,4 v126.0 z" class="bar"><title>m = 500: 123738 barridos</title></path>
+<text x="933" y="1366" class="tiny" text-anchor="middle" >500</text>
+<text x="933" y="1214.0" class="tinyv" text-anchor="middle" >123 738</text>
+<text x="540" y="1392" class="small" text-anchor="start" >m = 5: mínimo cómputo · m ≥ 100: mínimas rondas · hoy m = 500</text>
+<rect x="30" y="1430" width="940" height="260" rx="14" class="card" />
+<circle cx="60" cy="1462" r="14" class="num"/>
+<text x="60" y="1467" class="numt" text-anchor="middle" >7</text>
+<text x="84" y="1468" class="h2" text-anchor="start" >Cómo converger más rápido: cambiar el método externo</text>
+<text x="60" y="1520" class="lab" text-anchor="start" >Jacobi por bloques (hoy)</text>
+<path d="M360,1504 h206.0 a4,4 0 0 1 4,4 v14 a4,4 0 0 1 -4,4 h-206.0 z" class="bar"><title>Jacobi por bloques (hoy): 284 rondas</title></path>
+<text x="578.0" y="1520" class="val" text-anchor="start" >284 rondas</text>
+<text x="60" y="1566" class="lab" text-anchor="start" >SOR rojo-negro, ω = 1,516</text>
+<path d="M360,1550 h40.36619718309859 a4,4 0 0 1 4,4 v14 a4,4 0 0 1 -4,4 h-40.36619718309859 z" class="bar"><title>SOR rojo-negro, ω = 1,516: 60 rondas</title></path>
+<text x="412.3661971830986" y="1566" class="val" text-anchor="start" >60 rondas</text>
+<text x="60" y="1612" class="lab" text-anchor="start" >Gradiente conjugado + Jacobi por bloques</text>
+<path d="M360,1596 h15.225352112676056 a4,4 0 0 1 4,4 v14 a4,4 0 0 1 -4,4 h-15.225352112676056 z" class="bar"><title>Gradiente conjugado + Jacobi por bloques: 26 rondas</title></path>
+<text x="387.22535211267603" y="1612" class="val" text-anchor="start" >26 rondas</text>
+<line x1="360" y1="1498" x2="360" y2="1642" class="axis"/>
+<text x="720" y="1516" class="h3" text-anchor="start" >A 2-cíclica (Young):</text>
+<text x="720" y="1538" class="small" text-anchor="start" >ρ<tspan dy="4" font-size="72%">GS</tspan><tspan dy="-4">​</tspan> = ρ<tspan dy="4" font-size="72%">J</tspan><tspan dy="-4">​</tspan><tspan dy="-6" font-size="72%">2</tspan><tspan dy="6">​</tspan>,  ω<tspan dy="4" font-size="72%">opt</tspan><tspan dy="-4">​</tspan> = 2/(1 + √(1 − ρ<tspan dy="4" font-size="72%">J</tspan><tspan dy="-4">​</tspan><tspan dy="-6" font-size="72%">2</tspan><tspan dy="6">​</tspan>))</text>
+<text x="720" y="1576" class="h3" text-anchor="start" >Precondicionado (A y M</text>
+<text x="720" y="1596" class="h3" text-anchor="start" >simétricas definidas positivas):</text>
+<text x="720" y="1618" class="small" text-anchor="start" >κ(M<tspan dy="-6" font-size="72%">−1</tspan><tspan dy="6">​</tspan>A) ≈ 37 en vez de κ(A) ≈ 681</text>
+<text x="720" y="1638" class="small" text-anchor="start" >⇒ iteraciones ∝ √κ</text>
+<text x="60" y="1670" class="muted" text-anchor="start" >Los esclavos hacen el mismo trabajo de hoy (resolver A<tspan dy="4" font-size="72%">BB</tspan><tspan dy="-4">​</tspan>·z<tspan dy="4" font-size="72%">B</tspan><tspan dy="-4">​</tspan> = r<tspan dy="4" font-size="72%">B</tspan><tspan dy="-4">​</tspan>); el coordinador ya calcula A·x en cada ronda.</text>
+<rect x="30" y="1710" width="300" height="104" rx="14" class="card" />
+<text x="50" y="1742" class="h3" text-anchor="start" >Residuo gratis</text>
+<text x="50" y="1770" class="small" text-anchor="start" >s<tspan dy="4" font-size="72%">i</tspan><tspan dy="-4">​</tspan> = b<tspan dy="4" font-size="72%">i</tspan><tspan dy="-4">​</tspan> − Σ<tspan dy="4" font-size="72%">j≠i</tspan><tspan dy="-4">​</tspan> a<tspan dy="4" font-size="72%">ij</tspan><tspan dy="-4">​</tspan>x<tspan dy="4" font-size="72%">j</tspan><tspan dy="-4">​</tspan> da a la vez</text>
+<text x="50" y="1792" class="small" text-anchor="start" >x<tspan dy="4" font-size="72%">i</tspan><tspan dy="-4">​</tspan> ← s<tspan dy="4" font-size="72%">i</tspan><tspan dy="-4">​</tspan>/a<tspan dy="4" font-size="72%">ii</tspan><tspan dy="-4">​</tspan>  y  r<tspan dy="4" font-size="72%">i</tspan><tspan dy="-4">​</tspan> = s<tspan dy="4" font-size="72%">i</tspan><tspan dy="-4">​</tspan> − a<tspan dy="4" font-size="72%">ii</tspan><tspan dy="-4">​</tspan>x<tspan dy="4" font-size="72%">i</tspan><tspan dy="-4">​</tspan></text>
+<rect x="350" y="1710" width="300" height="104" rx="14" class="card" />
+<text x="370" y="1742" class="h3" text-anchor="start" >Residuo ≠ error</text>
+<text x="370" y="1770" class="small" text-anchor="start" >error rel. ≤ κ(A)·residuo rel., κ = 681</text>
+<text x="370" y="1792" class="small" text-anchor="start" >medido: 1,2·10<tspan dy="-6" font-size="72%">−7</tspan><tspan dy="6">​</tspan> vs 9,9·10<tspan dy="-6" font-size="72%">−9</tspan><tspan dy="6">​</tspan></text>
+<rect x="670" y="1710" width="300" height="104" rx="14" class="card" />
+<text x="690" y="1742" class="h3" text-anchor="start" >Asíncrono también</text>
+<text x="690" y="1770" class="small" text-anchor="start" >T<tspan dy="4" font-size="72%">m</tspan><tspan dy="-4">​</tspan> ≥ 0 ⇒ ρ(|T<tspan dy="4" font-size="72%">m</tspan><tspan dy="-4">​</tspan>|) &lt; 1: converge</text>
+<text x="690" y="1792" class="small" text-anchor="start" >sin barrera (Chazan–Miranker)</text>
+<text x="500" y="1850" class="muted" text-anchor="middle" >Números reproducibles con docs/experimentos_convergencia.py · detalle en docs/matematica.md</text>
+</g></svg>
