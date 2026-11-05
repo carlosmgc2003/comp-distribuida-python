@@ -1,9 +1,19 @@
+# Entornos y herramientas
 /venv
+/.venv
 /.idea
+/.vscode
+__pycache__/
+*.egg-info/
+/build
+/dist
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Datos y resultados generados
 /ejercicios
-*.txt
 *.db
-comp_distribuida
-__pycache__/analizador.cpython-37.pyc
-datos_coordinador.db-journal
+*.db-journal
 *.npy
+*.png
