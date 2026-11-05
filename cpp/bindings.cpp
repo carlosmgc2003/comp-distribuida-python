@@ -1,4 +1,4 @@
-// Módulo de Python `jacobi_nativo` (nanobind): expone resolver_bloque sin copias.
+// Módulo de Python `comp_distribuida._nativo` (nanobind): expone resolver_bloque sin copias.
 //
 // Reemplaza el esquema original "Python escribe un .db SQLite -> subprocess ->
 // C++ lee el .db -> escribe otro .db -> Python lo lee". Ahora el esclavo llama a
@@ -59,7 +59,7 @@ nb::tuple resolver_bloque_py(const Vec1D<jacobi::Indice>& indptr,
 
 }  // namespace
 
-NB_MODULE(jacobi_nativo, m) {
+NB_MODULE(_nativo, m) {
     m.doc() = "Núcleo en C++ del método de Jacobi por bloques (formato CSR).";
     m.def("resolver_bloque", &resolver_bloque_py, "indptr"_a, "indices"_a, "datos"_a,
           "fila_inicial"_a, "b_local"_a, "x_global"_a, "tolerancia"_a = 1e-10,

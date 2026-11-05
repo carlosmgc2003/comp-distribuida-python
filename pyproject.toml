@@ -1,11 +1,13 @@
+# Un solo build para todo el proyecto: `pip install .` compila el núcleo C++
+# (CMakeLists.txt) con scikit-build-core y lo instala como comp_distribuida._nativo.
 [build-system]
-requires = ["hatchling>=1.25"]
-build-backend = "hatchling.build"
+requires = ["scikit-build-core>=0.10", "nanobind>=2.0"]
+build-backend = "scikit_build_core.build"
 
 [project]
 name = "comp-distribuida"
 version = "2.0.0"
-description = "Resolución distribuida de sistemas lineales con Jacobi por bloques (ZeroMQ + núcleo C++)"
+description = "Resolución distribuida de sistemas lineales con Jacobi por bloques (ZeroMQ + núcleo C++23)"
 readme = "readme.md"
 requires-python = ">=3.11"
 authors = [{ name = "Carlos Maceira Garcia Coni" }]
@@ -17,8 +19,6 @@ dependencies = [
 
 [project.optional-dependencies]
 grafico = ["matplotlib>=3.8"]
-# Núcleo en C++ (repo comp-distribuida-cpp). Ver readme para instalarlo desde una copia local.
-nativo = ["jacobi-nativo @ git+https://github.com/carlosmgc2003/comp-distribuida-cpp"]
 
 [project.scripts]
 comp-distribuida = "comp_distribuida.cli:main"
@@ -26,11 +26,12 @@ comp-distribuida = "comp_distribuida.cli:main"
 [dependency-groups]
 dev = ["pytest>=8", "pytest-timeout>=2.3", "ruff>=0.6", "mypy>=1.11"]
 
-[tool.hatch.metadata]
-allow-direct-references = true  # para el extra "nativo" (dependencia por git)
-
-[tool.hatch.build.targets.wheel]
-packages = ["src/comp_distribuida"]
+[tool.scikit-build]
+minimum-version = "build-system.requires"
+build-dir = "build/{wheel_tag}"
+wheel.packages = ["src/comp_distribuida"]
+wheel.py-api = "cp312"  # ABI estable cuando Python >= 3.12
+sdist.exclude = ["build", ".github"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

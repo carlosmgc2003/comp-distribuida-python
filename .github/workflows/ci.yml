@@ -5,8 +5,22 @@ on:
   pull_request:
 
 jobs:
+  cpp:
+    name: C++ (${{ matrix.preset }})
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        preset: [release, asan]
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y ninja-build
+      - run: cmake --preset ${{ matrix.preset }}
+      - run: cmake --build --preset ${{ matrix.preset }}
+      - run: ctest --preset ${{ matrix.preset }}
+
   calidad:
-    name: Lint y tipos
+    name: Lint y tipos (Python)
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -16,8 +30,8 @@ jobs:
       - run: uv run --no-sync ruff format --check src tests
       - run: uv run --no-sync mypy src
 
-  tests:
-    name: Tests (Python ${{ matrix.python }}, motor NumPy)
+  python:
+    name: Tests Python ${{ matrix.python }} (con el núcleo C++)
     runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
@@ -28,22 +42,7 @@ jobs:
       - uses: astral-sh/setup-uv@v6
         with:
           python-version: ${{ matrix.python }}
+      # Compila cpp/ con scikit-build-core e instala comp_distribuida._nativo
       - run: uv venv && uv pip install -e . --group dev
-      - run: uv run --no-sync pytest
-
-  tests-nativo:
-    name: Tests con el núcleo C++
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/checkout@v4
-        with:
-          repository: carlosmgc2003/comp-distribuida-cpp
-          # Rama por defecto del repo C++: necesita la versión con pyproject.toml (v2)
-          path: comp-distribuida-cpp
-      - uses: astral-sh/setup-uv@v6
-        with:
-          python-version: "3.13"
-      - run: uv venv && uv pip install -e . ./comp-distribuida-cpp --group dev
-      - run: uv run --no-sync python -c "import jacobi_nativo"
+      - run: uv run --no-sync python -c "from comp_distribuida import _nativo"
       - run: uv run --no-sync pytest

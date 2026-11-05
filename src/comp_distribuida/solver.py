@@ -2,8 +2,9 @@
 
 Hay dos motores con la MISMA semántica:
 
-* ``nativo``: el módulo ``jacobi_nativo`` del repo comp-distribuida-cpp (C++23 +
-  nanobind). Se llama en el mismo proceso, con arrays de NumPy y sin copias.
+* ``nativo``: el módulo ``comp_distribuida._nativo``, compilado desde ``cpp/``
+  (C++23 + nanobind) al instalar el paquete. Se llama en el mismo proceso, con
+  arrays de NumPy y sin copias.
 * ``numpy``: implementación vectorizada de referencia, para no depender de un
   compilador (y para testear que ambos coinciden).
 
@@ -25,9 +26,9 @@ import scipy.sparse as sp
 from comp_distribuida.problema import Bloque, Problema, VectorF
 
 try:
-    import jacobi_nativo  # type: ignore[import-not-found]
-except ImportError:  # pragma: no cover - depende del entorno
-    jacobi_nativo = None
+    import comp_distribuida._nativo as jacobi_nativo
+except ImportError:  # pragma: no cover - p.ej. corriendo desde el código fuente sin compilar
+    jacobi_nativo = None  # type: ignore[assignment]
 
 log = logging.getLogger(__name__)
 
@@ -87,8 +88,8 @@ def motor_disponible(motor: Motor = "auto") -> Literal["nativo", "numpy"]:
         return "nativo"
     if motor == "nativo":
         raise RuntimeError(
-            "No está instalado jacobi_nativo. Instalarlo con: "
-            "pip install <ruta a comp-distribuida-cpp>"
+            "El núcleo C++ (comp_distribuida._nativo) no está compilado. "
+            "Instalar el paquete con: pip install ."
         )
     return "numpy"
 

@@ -1,9 +1,10 @@
 # Revisión del TP (2019) y modernización (2026)
 
-Este documento acompaña a los dos repositorios del trabajo:
-
-- [`comp-distribuida-python`](https://github.com/carlosmgc2003/comp-distribuida-python): coordinador y esclavos (ZeroMQ).
-- [`comp-distribuida-cpp`](https://github.com/carlosmgc2003/comp-distribuida-cpp): núcleo numérico (Jacobi).
+En 2019 el trabajo estaba en dos repositorios: `comp-distribuida-python`
+(coordinador y esclavos con ZeroMQ) y `comp-distribuida-cpp` (núcleo numérico).
+Hoy está todo en este repositorio, con el historial de ambos: el código Python
+en `src/` y el C++ en `cpp/` (los commits de 2019 del C++ aparecen con sus rutas
+originales, antes de moverse a `cpp/`).
 
 El objetivo del TP era resolver `A·x = b` repartiendo bloques de filas entre
 varias máquinas: un **coordinador** en Python reparte trabajos, cada **esclavo**
@@ -216,7 +217,7 @@ comunicación). Es el compromiso central de la descomposición de dominio.
                             │                       ▼ bloque, b_B, x)
                  ┌──────────┴──────── esclavo (Python, REQ) ──────────┐
                  │ Lazy Pirate (timeout + reintento con socket nuevo) │
-                 │ jacobi_nativo.resolver_bloque(...)  ← C++23        │
+                 │ _nativo.resolver_bloque(...)  ← C++23 (cpp/)     │
                  │   (o NumPy si no está compilado)                   │
                  └────────────────────────────────────────────────────┘
 ```
@@ -226,7 +227,7 @@ comunicación). Es el compromiso central de la descomposición de dominio.
 | Antes | Ahora | Por qué |
 |-------|-------|---------|
 | SQLite como formato intermedio (coordinador, esclavo y C++) | CSR en memoria (`scipy.sparse`, `std::span`) | Es el formato estándar para matrices dispersas; sin E/S a disco |
-| `subprocess` + archivo `.db` entre Python y C++ | Módulo nativo con **nanobind** + **scikit-build-core**, sin copias, liberando el GIL | Una llamada a función en lugar de 2 bases de datos y un proceso por trabajo |
+| `subprocess` + archivo `.db` entre Python y C++ | Módulo nativo con **nanobind** + **scikit-build-core** (`pip install .` compila todo), sin copias, liberando el GIL | Una llamada a función en lugar de 2 bases de datos y un proceso por trabajo |
 | Un mensaje JSON por coeficiente | Un mensaje multiparte por trabajo, arrays binarios | De ~9 500 idas y vueltas a 1; sin pérdida de precisión |
 | `REP` + estado implícito | `ROUTER` + patrón *load balancing* con pedidos retenidos | Muchos esclavos a la vez, sin `EFSM`, sin esperas activas |
 | Sin tolerancia a fallos | Plazo por trabajo, reasignación, resultados idempotentes | Un esclavo caído ya no cuelga el sistema |
@@ -234,6 +235,7 @@ comunicación). Es el compromiso central de la descomposición de dominio.
 | Errores silenciosos / UB | `std::expected<Resultado, Error>` en C++, `ErrorCalculo` en Python | Los errores de datos (diagonal nula, divergencia) se informan |
 | C++14, `printf`, `typedef struct` | C++23: `std::expected`, `std::span`, `std::format`, inicializadores designados | Más seguro y expresivo |
 | CMake con flags que no se aplicaban | Target de interfaz con warnings estrictos, presets (`debug`, `release`, `asan`), Catch2, CTest | Compila limpio con `-Werror` y sanitizers |
+| Dos repositorios, un binario copiado a mano junto al esclavo | Un solo repositorio y un solo build (CMake invocado por `pip`) | Python y C++ no pueden quedar desincronizados |
 | Scripts sueltos, `input()` para la IP | Paquete instalable (`pyproject.toml`), CLI `comp-distribuida`, `logging` | Reproducible y configurable |
 | Sin tests | 7 tests C++ + 43 tests Python (unitarios, protocolo, integración con esclavos reales) | Cada bug de arriba tiene un test de regresión |
 | `pickle` no, pero JSON por campo | JSON sólo para la cabecera; dtypes validados (sin `pickle`) | Deserializar `pickle` de la red permite ejecutar código |

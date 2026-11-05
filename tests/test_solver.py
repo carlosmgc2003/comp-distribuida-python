@@ -10,9 +10,7 @@ MOTORES = [
     "numpy",
     pytest.param(
         "nativo",
-        marks=pytest.mark.skipif(
-            solver.jacobi_nativo is None, reason="jacobi_nativo (repo C++) no instalado"
-        ),
+        marks=pytest.mark.skipif(solver.jacobi_nativo is None, reason="núcleo C++ no compilado"),
     ),
 ]
 
@@ -55,7 +53,7 @@ def test_jacobi_por_bloques_converge(motor: str, tam: int) -> None:
     np.testing.assert_allclose(x, spla.spsolve(p.A.tocsc(), p.b), atol=1e-7)
 
 
-@pytest.mark.skipif(solver.jacobi_nativo is None, reason="jacobi_nativo no instalado")
+@pytest.mark.skipif(solver.jacobi_nativo is None, reason="núcleo C++ no compilado")
 def test_nativo_y_numpy_coinciden() -> None:
     p = generar_placa(10)
     rng = np.random.default_rng(0)

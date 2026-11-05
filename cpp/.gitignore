@@ -1,9 +1,0 @@
-/build
-/cmake-build-*
-/.idea
-/.vscode
-/.cache
-*.so
-*.pyd
-__pycache__/
-/dist
