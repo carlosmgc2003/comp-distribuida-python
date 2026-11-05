@@ -1,0 +1,63 @@
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[project]
+name = "comp-distribuida"
+version = "2.0.0"
+description = "Resolución distribuida de sistemas lineales con Jacobi por bloques (ZeroMQ + núcleo C++)"
+readme = "readme.md"
+requires-python = ">=3.11"
+authors = [{ name = "Carlos Maceira Garcia Coni" }]
+dependencies = [
+    "numpy>=1.26",
+    "scipy>=1.12",
+    "pyzmq>=26",
+]
+
+[project.optional-dependencies]
+grafico = ["matplotlib>=3.8"]
+# Núcleo en C++ (repo comp-distribuida-cpp). Ver readme para instalarlo desde una copia local.
+nativo = ["jacobi-nativo @ git+https://github.com/carlosmgc2003/comp-distribuida-cpp"]
+
+[project.scripts]
+comp-distribuida = "comp_distribuida.cli:main"
+
+[dependency-groups]
+dev = ["pytest>=8", "pytest-timeout>=2.3", "ruff>=0.6", "mypy>=1.11"]
+
+[tool.hatch.metadata]
+allow-direct-references = true  # para el extra "nativo" (dependencia por git)
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/comp_distribuida"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+timeout = 120
+addopts = "-ra"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "SIM", "RUF", "PL", "PT", "N"]
+ignore = [
+    "N803", "N806",   # A, A_int, etc.: nombres matemáticos
+    "PLR0913",        # funciones con muchos argumentos
+    "PLR2004",        # constantes "mágicas" en tests
+    "RUF001", "RUF002", "RUF003",  # caracteres unicode (ñ, ², ·) en docs
+    "B008",           # dataclasses inmutables como valor por defecto
+    "N818",           # excepciones con nombre en castellano (ErrorCalculo, ...)
+    "PLR0917",        # muchos argumentos posicionales
+]
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+warn_unused_ignores = false
+
+[[tool.mypy.overrides]]
+module = ["scipy.*", "matplotlib.*"]
+ignore_missing_imports = true

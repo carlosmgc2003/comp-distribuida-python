@@ -1,0 +1,49 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  calidad:
+    name: Lint y tipos
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+      - run: uv venv && uv pip install -e . --group dev
+      - run: uv run --no-sync ruff check src tests
+      - run: uv run --no-sync ruff format --check src tests
+      - run: uv run --no-sync mypy src
+
+  tests:
+    name: Tests (Python ${{ matrix.python }}, motor NumPy)
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ matrix.python }}
+      - run: uv venv && uv pip install -e . --group dev
+      - run: uv run --no-sync pytest
+
+  tests-nativo:
+    name: Tests con el núcleo C++
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4
+        with:
+          repository: carlosmgc2003/comp-distribuida-cpp
+          # Rama por defecto del repo C++: necesita la versión con pyproject.toml (v2)
+          path: comp-distribuida-cpp
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+      - run: uv venv && uv pip install -e . ./comp-distribuida-cpp --group dev
+      - run: uv run --no-sync python -c "import jacobi_nativo"
+      - run: uv run --no-sync pytest
