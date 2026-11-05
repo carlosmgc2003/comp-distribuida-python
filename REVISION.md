@@ -243,7 +243,7 @@ comunicación). Es el compromiso central de la descomposición de dominio.
 | CMake con flags que no se aplicaban | Target de interfaz con warnings estrictos, presets (`debug`, `release`, `asan`), Catch2, CTest | Compila limpio con `-Werror` y sanitizers |
 | Dos repositorios, un binario copiado a mano junto al esclavo | Un solo repositorio y un solo build (CMake invocado por `pip`) | Python y C++ no pueden quedar desincronizados |
 | Scripts sueltos, `input()` para la IP | Paquete instalable (`pyproject.toml`), CLI `comp-distribuida`, `logging` | Reproducible y configurable |
-| Sin tests | 7 tests C++ + 50 tests Python (unitarios, protocolo, integración con esclavos reales) | Cada bug de arriba tiene un test de regresión |
+| Sin tests | 7 tests C++ + 60 tests Python (unitarios, protocolo, integración con esclavos reales) | Cada bug de arriba tiene un test de regresión |
 | `pickle` no, pero JSON por campo | JSON sólo para la cabecera; dtypes validados (sin `pickle`) | Deserializar `pickle` de la red permite ejecutar código |
 
 ### Un hallazgo durante la modernización
@@ -268,6 +268,11 @@ la cota es `‖e‖/‖x‖ ≤ κ(A)·‖r‖/‖b‖` con `κ₂(A) ≈ 681` p
 residuo chico no implica error igual de chico. El `9,2e-6` de arriba es un error
 absoluto, en grados, y no se compara directamente con un residuo relativo.)
 
+(Los segundos de arriba incluían, por un error de medición corregido después, el
+segundo fijo que el coordinador pasa despidiendo a los esclavos: la resolución en sí
+tarda ~0,7 s. Con `--metodo pcg` el mismo problema converge en 26 rondas y ~0,08 s;
+ver [docs/matematica.md](docs/matematica.md).)
+
 ---
 
 ## 5. Próximos pasos posibles
@@ -278,9 +283,9 @@ absoluto, en grados, y no se compara directamente con un residuo relativo.)
    columnas externas que aparecen en sus filas, no el vector entero.
 3. **Asincronía** (Jacobi/Gauss-Seidel asíncrono): usar cada resultado apenas
    llega, sin barrera por iteración. Es lo que el diseño original insinuaba.
-4. **Mejor método**: Jacobi por bloques como *precondicionador* de Gradiente
-   Conjugado converge en decenas de iteraciones en lugar de cientos; o Schwarz
-   aditivo con solapamiento, o multigrid.
+4. **Mejor método**: ✅ Jacobi por bloques como *precondicionador* de Gradiente
+   Conjugado ya está implementado (`--metodo pcg`: 26 rondas en lugar de 284).
+   Quedan Schwarz aditivo con solapamiento o multigrid.
 5. **Paralelismo dentro del esclavo**: el barrido de Jacobi es trivialmente
    paralelo (OpenMP o `std::execution::par`).
 6. **Herramientas "industriales"** para comparar: `mpi4py` (MPI), Dask o Ray

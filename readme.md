@@ -56,6 +56,10 @@ Todo en un solo proceso (coordinador + 4 esclavos en hilos), para probar:
 comp-distribuida local ejercicios/matriz.txt ejercicios/vector.txt --tam-bloque 400 --esclavos 4
 ```
 
+Si `A` es simétrica definida positiva (como la placa), `--metodo pcg` usa gradiente
+conjugado precondicionado con Jacobi por bloques: en la placa 40×40 converge en 26
+rondas en lugar de 284 (0,08 s contra 0,72 s), con los mismos esclavos.
+
 Opciones útiles del coordinador: `--tol` (residuo global), `--max-internas`
 (barridos de Jacobi por trabajo; con `1` es Jacobi clásico distribuido),
 `--plazo` (segundos antes de reasignar un trabajo), `--guardar x.npy`.

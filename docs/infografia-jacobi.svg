@@ -273,14 +273,14 @@ svg{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial
 <circle cx="60" cy="1462" r="14" class="num"/>
 <text x="60" y="1467" class="numt" text-anchor="middle" >7</text>
 <text x="84" y="1468" class="h2" text-anchor="start" >Cómo converger más rápido: cambiar el método externo</text>
-<text x="60" y="1520" class="lab" text-anchor="start" >Jacobi por bloques (hoy)</text>
-<path d="M360,1504 h206.0 a4,4 0 0 1 4,4 v14 a4,4 0 0 1 -4,4 h-206.0 z" class="bar"><title>Jacobi por bloques (hoy): 284 rondas</title></path>
+<text x="60" y="1520" class="lab" text-anchor="start" >--metodo jacobi (por defecto)</text>
+<path d="M360,1504 h206.0 a4,4 0 0 1 4,4 v14 a4,4 0 0 1 -4,4 h-206.0 z" class="bar"><title>--metodo jacobi (por defecto): 284 rondas</title></path>
 <text x="578.0" y="1520" class="val" text-anchor="start" >284 rondas</text>
-<text x="60" y="1566" class="lab" text-anchor="start" >SOR rojo-negro, ω = 1,516</text>
-<path d="M360,1550 h40.36619718309859 a4,4 0 0 1 4,4 v14 a4,4 0 0 1 -4,4 h-40.36619718309859 z" class="bar"><title>SOR rojo-negro, ω = 1,516: 60 rondas</title></path>
+<text x="60" y="1566" class="lab" text-anchor="start" >SOR rojo-negro, ω = 1,516 (sin implementar)</text>
+<path d="M360,1550 h40.36619718309859 a4,4 0 0 1 4,4 v14 a4,4 0 0 1 -4,4 h-40.36619718309859 z" class="bar"><title>SOR rojo-negro, ω = 1,516 (sin implementar): 60 rondas</title></path>
 <text x="412.3661971830986" y="1566" class="val" text-anchor="start" >60 rondas</text>
-<text x="60" y="1612" class="lab" text-anchor="start" >Gradiente conjugado + Jacobi por bloques</text>
-<path d="M360,1596 h15.225352112676056 a4,4 0 0 1 4,4 v14 a4,4 0 0 1 -4,4 h-15.225352112676056 z" class="bar"><title>Gradiente conjugado + Jacobi por bloques: 26 rondas</title></path>
+<text x="60" y="1612" class="lab" text-anchor="start" >--metodo pcg (gradiente conjugado)</text>
+<path d="M360,1596 h15.225352112676056 a4,4 0 0 1 4,4 v14 a4,4 0 0 1 -4,4 h-15.225352112676056 z" class="bar"><title>--metodo pcg (gradiente conjugado): 26 rondas</title></path>
 <text x="387.22535211267603" y="1612" class="val" text-anchor="start" >26 rondas</text>
 <line x1="360" y1="1498" x2="360" y2="1642" class="axis"/>
 <text x="720" y="1516" class="h3" text-anchor="start" >A 2-cíclica (Young):</text>
@@ -289,7 +289,7 @@ svg{font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial
 <text x="720" y="1596" class="h3" text-anchor="start" >simétricas definidas positivas):</text>
 <text x="720" y="1618" class="small" text-anchor="start" >κ(M<tspan dy="-6" font-size="72%">−1</tspan><tspan dy="6">​</tspan>A) ≈ 37 en vez de κ(A) ≈ 681</text>
 <text x="720" y="1638" class="small" text-anchor="start" >⇒ iteraciones ∝ √κ</text>
-<text x="60" y="1670" class="muted" text-anchor="start" >Los esclavos hacen el mismo trabajo de hoy (resolver A<tspan dy="4" font-size="72%">BB</tspan><tspan dy="-4">​</tspan>·z<tspan dy="4" font-size="72%">B</tspan><tspan dy="-4">​</tspan> = r<tspan dy="4" font-size="72%">B</tspan><tspan dy="-4">​</tspan>); el coordinador ya calcula A·x en cada ronda.</text>
+<text x="60" y="1670" class="muted" text-anchor="start" >pcg: 0,08 s contra 0,72 s de jacobi. Los esclavos hacen el mismo trabajo (A<tspan dy="4" font-size="72%">BB</tspan><tspan dy="-4">​</tspan>·z<tspan dy="4" font-size="72%">B</tspan><tspan dy="-4">​</tspan> = r<tspan dy="4" font-size="72%">B</tspan><tspan dy="-4">​</tspan>); el coordinador, A·d y productos escalares.</text>
 <rect x="30" y="1710" width="300" height="104" rx="14" class="card" />
 <text x="50" y="1742" class="h3" text-anchor="start" >Residuo gratis</text>
 <text x="50" y="1770" class="small" text-anchor="start" >s<tspan dy="4" font-size="72%">i</tspan><tspan dy="-4">​</tspan> = b<tspan dy="4" font-size="72%">i</tspan><tspan dy="-4">​</tspan> − Σ<tspan dy="4" font-size="72%">j≠i</tspan><tspan dy="-4">​</tspan> a<tspan dy="4" font-size="72%">ij</tspan><tspan dy="-4">​</tspan>x<tspan dy="4" font-size="72%">j</tspan><tspan dy="-4">​</tspan> da a la vez</text>

@@ -173,12 +173,16 @@ El esclavo usa `tol_interna = 1e-10` (más estricta que la global, `1e-8`) relat
 
 **Pero en este sistema mandan las rondas, no los barridos.** Un barrido de 400 filas
 cuesta ~1,2 µs; una ronda (serialización, ZeroMQ, Python, barrera) cuesta milisegundos.
-Tiempo real con `comp-distribuida local` (4 esclavos, localhost):
+Tiempo real con `comp-distribuida local` (4 esclavos, localhost; mediana de 3
+corridas, sin el segundo de despedida, ver F6):
 
 | `--max-internas` | 500 | 100 | 20 | 10 | 5 | 2 |
 |---|---|---|---|---|---|---|
 | rondas | 284 | 288 | 434 | 646 | 1 098 | 2 496 |
-| segundos | 1,82 | **1,74** | 2,25 | 2,71 | 3,99 | 7,88 |
+| segundos | 0,72 | **0,64** | 1,00 | 1,59 | 2,56 | 5,99 |
+
+Cada ronda cuesta ~2,4 ms, casi todo fijo: la diferencia entre 100 y 500 barridos
+por trabajo apenas se nota.
 
 Conclusión: bajar el tope a ~100 (o usar el criterio relativo con θ ≈ 0,03) ahorra
 75–80 % de CPU sin perder tiempo; bajar a `m` chico ahorra aún más CPU pero cuesta
@@ -208,11 +212,31 @@ Decía que "el error es ~1 000 veces el residuo porque κ ~ 10³", comparando un
 correcta está en §2.6. También decía que converge "porque A es diagonal dominante":
 falta la irreducibilidad (§2.1).
 
+### F6 · El tiempo informado incluía un segundo de despedida — **corregido**
+
+`ResultadoGlobal.segundos` se medía después de `_despedir()`, que sigue respondiendo
+`FIN` durante `despedida_s = 1` s para que los esclavos terminen limpio. Ese segundo
+fijo se sumaba a todas las mediciones: con 284 rondas el informe decía 1,82 s, de los
+cuales la resolución eran 0,72 s, y escondía buena parte de la mejora de PCG (1,07 s
+contra 1,71 s, en lugar de 0,08 s contra 0,72 s). Ahora se mide antes de la despedida.
+
 ---
 
 ## 4. Optimizaciones (de mayor a menor impacto)
 
-### O1 · Cambiar el método externo: de 284 rondas a 26–60
+### O1 · Cambiar el método externo: de 284 rondas a 26–60 — **PCG implementado**
+
+```bash
+comp-distribuida local ejercicios/matriz.txt ejercicios/vector.txt --tam-bloque 400 --metodo pcg
+```
+
+| placa (4 bloques, 4 esclavos, localhost) | Jacobi por bloques | `--metodo pcg` |
+|---|---|---|
+| 40×40 (n = 1 600) | 284 rondas, 0,72 s | **26 rondas, 0,08 s** |
+| 80×80 (n = 6 400) | 523 rondas, 3,18 s | **33 rondas, 0,19 s** |
+
+Las rondas de Jacobi crecen casi con el lado de la placa (`1/(1 − ρ)`); las de PCG,
+con su raíz (`√κ`): cuanto más grande el problema, mayor la ventaja.
 
 **Estructura que se puede aprovechar.** Con bloques de filas consecutivas de la placa
 (franjas de 10 filas de la grilla), cada bloque sólo se acopla con el anterior y el
@@ -243,15 +267,37 @@ converge en `O(√κ)` iteraciones.
 | PCG + 10 barridos de Jacobi por bloque | 36 |
 | PCG + 1 barrido (= CG con Jacobi puntual) | 111 |
 
-PCG encaja casi sin cambios en la arquitectura:
+Cómo está implementado (`Coordinador._gradiente_conjugado`):
 
-* el coordinador **ya** calcula `A·x` en cada ronda para el residuo; PCG necesita un
-  producto `A·d` y dos productos escalares, que también hace el coordinador;
-* los esclavos aplican `M⁻¹r` resolviendo `A_BB z_B = r_B` con `x_ext = 0`: es el
-  mismo trabajo de hoy con `b_local = r_B` y `x_global = 0`. Con `m` barridos fijos
-  desde cero (tolerancia 0) el precondicionador es lineal y simétrico
-  (`Σ_{j<m} Pʲ D⁻¹`), como exige CG. Si se corta por tolerancia, hay que usar CG
-  flexible.
+* **Sin cambios en esclavos, protocolo ni núcleo C++.** Los esclavos aplican `M⁻¹r`
+  resolviendo `A_BB z_B = r_B` con `x_ext = 0`: es el mismo `Trabajo` de Jacobi con
+  `b_local = r_B` y `x_global = 0`. El coordinador hace el producto `A·d` (uno por
+  ronda, como Jacobi para su residuo) y los productos escalares.
+* **CG flexible.** `β = r⁺·(z⁺ − z) / (r·z)` (Polak–Ribière) en lugar del clásico
+  `r⁺·z⁺ / (r·z)`. Con `m` barridos fijos desde cero (`--tol-interna 0`) el
+  precondicionador es lineal y simétrico (`Σ_{j<m} Pʲ D⁻¹`) y los dos coinciden en
+  aritmética exacta. Si el esclavo corta por tolerancia, `M⁻¹` depende de `r` y sólo
+  la versión flexible conserva las garantías. La tolerancia interna es relativa a
+  `‖r_B‖`, que es justo el criterio relativo recomendado en F2.
+* **Residuo verdadero al final.** El residuo que CG actualiza por recurrencia se
+  aparta del verdadero por redondeo; antes de declarar convergencia se recalcula
+  `b − A·x` y, si no alcanza, se sigue desde ese residuo.
+* **Validaciones.** Al construir el coordinador: `A` simétrica, diagonal positiva y al
+  menos un barrido interno (si no, `ValueError`). Durante la iteración: `d·A·d ≤ 0` o
+  `r·z ≤ 0` indican que `A` o `M` no son definidas positivas (`ErrorCalculo`, en vez
+  de iterar sin sentido).
+* Plazos, reasignación de trabajos caídos y descarte de resultados viejos son los
+  mismos de Jacobi: las dos variantes comparten `Coordinador._ronda`.
+
+Con el núcleo actual, `--tol-interna` y `--max-internas` regulan cuánto se acerca `M⁻¹`
+al Jacobi por bloques exacto:
+
+| opciones internas | rondas PCG (40×40) |
+|---|---|
+| por defecto (tol 1e-10, máx 500) | 26 |
+| `--max-internas 20` | 32 |
+| `--max-internas 10` | 36 |
+| `--tol-interna 0.01` | 41 |
 
 ### O2 · Cachear la factorización del bloque en el esclavo
 

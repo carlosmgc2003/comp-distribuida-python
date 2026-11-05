@@ -180,7 +180,7 @@ t(540, Y + 312, "m = 5: mínimo cómputo · m ≥ 100: mínimas rondas · hoy m 
 # ---------------------------------------------------------------- 7. acelerar
 Y = 1430
 card(30, Y, 940, 260, 7, "Cómo converger más rápido: cambiar el método externo")
-datos7 = [("Jacobi por bloques (hoy)", 284), ("SOR rojo-negro, ω = 1,516", 60), ("Gradiente conjugado + Jacobi por bloques", 26)]
+datos7 = [("--metodo jacobi (por defecto)", 284), ("SOR rojo-negro, ω = 1,516 (sin implementar)", 60), ("--metodo pcg (gradiente conjugado)", 26)]
 x0, maxw = 360, 210
 for n, (nom, v) in enumerate(datos7):
     y = Y + 74 + n * 46
@@ -195,7 +195,7 @@ t(720, Y + 146, "Precondicionado (A y M", "h3")
 t(720, Y + 166, "simétricas definidas positivas):", "h3")
 t(720, Y + 188, "κ(M^{−1}A) ≈ 37 en vez de κ(A) ≈ 681", "small")
 t(720, Y + 208, "⇒ iteraciones ∝ √κ", "small")
-t(60, Y + 240, "Los esclavos hacen el mismo trabajo de hoy (resolver A_{BB}·z_{B} = r_{B}); el coordinador ya calcula A·x en cada ronda.", "muted")
+t(60, Y + 240, "pcg: 0,08 s contra 0,72 s de jacobi. Los esclavos hacen el mismo trabajo (A_{BB}·z_{B} = r_{B}); el coordinador, A·d y productos escalares.", "muted")
 
 # ---------------------------------------------------------------- 8. datos útiles
 Y = 1710

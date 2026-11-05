@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy as np
 import zmq
 
-from comp_distribuida.coordinador import ConfigCoordinador, Coordinador, ResultadoGlobal
+from comp_distribuida.coordinador import METODOS, ConfigCoordinador, Coordinador, ResultadoGlobal
 from comp_distribuida.esclavo import ConfigEsclavo, Esclavo, SinCoordinador
 from comp_distribuida.problema import cargar, generar_placa, guardar_texto
 from comp_distribuida.solver import ErrorCalculo, Opciones, motor_disponible
@@ -28,6 +28,13 @@ def _argumentos_coordinador(p: argparse.ArgumentParser) -> None:
     p.add_argument("vector", type=Path, help="vector b (texto)")
     p.add_argument("--tam-bloque", type=int, default=100, help="filas por trabajo (def. 100)")
     p.add_argument("--tol", type=float, default=1e-8, help="residuo relativo global (def. 1e-8)")
+    p.add_argument(
+        "--metodo",
+        choices=METODOS,
+        default="jacobi",
+        help="jacobi: Jacobi por bloques; pcg: gradiente conjugado precondicionado con "
+        "Jacobi por bloques (A simétrica definida positiva; muchas menos rondas)",
+    )
     p.add_argument("--max-externas", type=int, default=2000)
     p.add_argument("--tol-interna", type=float, default=1e-10)
     p.add_argument(
@@ -54,6 +61,7 @@ def _config_coordinador(a: argparse.Namespace, direccion: str) -> ConfigCoordina
         direccion=direccion,
         tam_bloque=a.tam_bloque,
         tolerancia=a.tol,
+        metodo=a.metodo,
         max_iteraciones_externas=a.max_externas,
         opciones_internas=Opciones(a.tol_interna, a.max_internas),
         plazo_trabajo_s=a.plazo,
@@ -62,8 +70,9 @@ def _config_coordinador(a: argparse.Namespace, direccion: str) -> ConfigCoordina
 
 def _informar(a: argparse.Namespace, r: ResultadoGlobal) -> int:
     print(
-        f"{'Convergió' if r.convergio else 'NO convergió'}: {r.iteraciones_externas} iteraciones "
-        f"externas, residuo {r.residuo:.3e}, {r.trabajos_enviados} trabajos "
+        f"{'Convergió' if r.convergio else 'NO convergió'} ({r.metodo}): "
+        f"{r.iteraciones_externas} iteraciones, {r.rondas} rondas, "
+        f"residuo {r.residuo:.3e}, {r.trabajos_enviados} trabajos "
         f"({r.trabajos_reasignados} reasignados), {len(r.esclavos)} esclavos, {r.segundos:.2f} s"
     )
     if a.guardar:
@@ -77,7 +86,8 @@ def _informar(a: argparse.Namespace, r: ResultadoGlobal) -> int:
 
         graficar_placa(
             r.x,
-            f"Placa: {r.iteraciones_externas} iteraciones, bloques de {a.tam_bloque} filas",
+            f"Placa ({r.metodo}): {r.iteraciones_externas} iteraciones, "
+            f"bloques de {a.tam_bloque} filas",
             a.graficar or None,
         )
     return 0 if r.convergio else 2
