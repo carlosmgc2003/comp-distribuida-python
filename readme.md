@@ -11,6 +11,10 @@ residuo global `‖b − A·x‖ / ‖b‖` es menor que la tolerancia.
 ➡️ **[REVISION.md](REVISION.md)**: análisis de los bugs de la versión 2019
 (reproducidos) y de las decisiones de la versión actual.
 
+➡️ **[docs/matematica.md](docs/matematica.md)**: por qué converge el método (con una
+[infografía](docs/infografia-jacobi.svg)), falencias numéricas encontradas y cómo
+acelerarlo, con números reproducibles (`python docs/experimentos_convergencia.py`).
+
 > Este repositorio une los dos originales (`comp-distribuida-python` y
 > `comp-distribuida-cpp`) conservando el historial de ambos.
 
@@ -52,6 +56,10 @@ Todo en un solo proceso (coordinador + 4 esclavos en hilos), para probar:
 comp-distribuida local ejercicios/matriz.txt ejercicios/vector.txt --tam-bloque 400 --esclavos 4
 ```
 
+Si `A` es simétrica definida positiva (como la placa), `--metodo pcg` usa gradiente
+conjugado precondicionado con Jacobi por bloques: en la placa 40×40 converge en 26
+rondas en lugar de 284 (0,08 s contra 0,72 s), con los mismos esclavos.
+
 Opciones útiles del coordinador: `--tol` (residuo global), `--max-internas`
 (barridos de Jacobi por trabajo; con `1` es Jacobi clásico distribuido),
 `--plazo` (segundos antes de reasignar un trabajo), `--guardar x.npy`.
@@ -78,6 +86,7 @@ cpp/
   bindings.cpp               módulo comp_distribuida._nativo (nanobind)
   tests/test_jacobi.cpp      tests C++ (Catch2)
 tests/                     tests Python: unitarios, protocolo e integración con esclavos reales
+docs/                      teoría del método, infografía y experimentos de convergencia
 CMakeLists.txt             build C++ (lo usa pip vía scikit-build-core, o CMake directo)
 pyproject.toml             paquete Python
 ```

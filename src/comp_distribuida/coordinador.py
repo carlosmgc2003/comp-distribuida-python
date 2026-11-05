@@ -1,12 +1,35 @@
-"""Coordinador: reparte bloques entre esclavos y ejecuta Jacobi por bloques.
+"""Coordinador: reparte bloques entre esclavos y resuelve A·x = b.
 
-Algoritmo (Jacobi por bloques síncrono):
+Hay dos métodos (``ConfigCoordinador.metodo``). En los dos, una **ronda** es lo
+mismo para los esclavos: cada uno resuelve (con m barridos de Jacobi) el sistema
+local de un bloque de filas. Cambia qué hace el coordinador con los resultados.
+
+``"jacobi"`` — Jacobi por bloques síncrono (una ronda por iteración):
 
     x⁰ = 0
     repetir k = 1, 2, ...
         para cada bloque B (en paralelo, en los esclavos):
             x_B^k = resolver  A_BB·x_B = b_B - A_B,ext·x_ext^(k-1)
         si ||b - A·x^k|| / ||b|| <= tolerancia: terminar
+
+``"pcg"`` — gradiente conjugado precondicionado con Jacobi por bloques. Exige A
+simétrica definida positiva. Los esclavos aplican z = M⁻¹·r (M = diagonal por
+bloques de A) resolviendo A_BB·z_B = r_B con x_ext = 0; el coordinador hace el
+producto A·d y los productos escalares. Una ronda por iteración, pero muchas
+menos iteraciones: κ(M⁻¹A) es mucho menor que κ(A) (ver docs/matematica.md).
+
+    x⁰ = 0,  r⁰ = b,  z⁰ = M⁻¹r⁰,  d⁰ = z⁰
+    repetir k = 0, 1, ...
+        α = (rᵏ·zᵏ) / (dᵏ·A·dᵏ)
+        xᵏ⁺¹ = xᵏ + α·dᵏ,   rᵏ⁺¹ = rᵏ - α·A·dᵏ
+        si ||rᵏ⁺¹|| / ||b|| <= tolerancia: terminar
+        zᵏ⁺¹ = M⁻¹rᵏ⁺¹                                  (ronda en los esclavos)
+        β = rᵏ⁺¹·(zᵏ⁺¹ - zᵏ) / (rᵏ·zᵏ)                    (Polak-Ribière)
+        dᵏ⁺¹ = zᵏ⁺¹ + β·dᵏ
+
+Se usa el β de Polak-Ribière (CG "flexible"): si los esclavos cortan por
+tolerancia, M⁻¹ deja de ser un operador lineal fijo y el β clásico pierde sus
+garantías; con un M⁻¹ lineal los dos β coinciden en aritmética exacta.
 
 Robustez frente al original:
 
@@ -26,8 +49,9 @@ from __future__ import annotations
 import logging
 import time
 from collections import deque
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from types import TracebackType
+from typing import Literal
 
 import numpy as np
 import zmq
@@ -48,12 +72,17 @@ from comp_distribuida.solver import DatosBloque, ErrorCalculo, Opciones
 
 log = logging.getLogger(__name__)
 
+Metodo = Literal["jacobi", "pcg"]
+METODOS: tuple[Metodo, ...] = ("jacobi", "pcg")
+
 
 @dataclass(frozen=True, slots=True)
 class ConfigCoordinador:
     direccion: str = "tcp://*:5555"
     tam_bloque: int = 100
     tolerancia: float = 1e-8
+    metodo: Metodo = "jacobi"
+    """"jacobi" (Jacobi por bloques) o "pcg" (gradiente conjugado precondicionado)."""
     max_iteraciones_externas: int = 2_000
     opciones_internas: Opciones = field(
         default_factory=lambda: Opciones(tolerancia=1e-10, max_iteraciones=500)
@@ -74,6 +103,9 @@ class ResultadoGlobal:
     iteraciones_externas: int
     residuo: float
     historial_residuos: list[float] = field(default_factory=list)
+    metodo: Metodo = "jacobi"
+    rondas: int = 0
+    """Rondas de trabajo repartidas a los esclavos (idas y vueltas por la red)."""
     trabajos_enviados: int = 0
     trabajos_reasignados: int = 0
     esclavos: set[str] = field(default_factory=set)
@@ -87,6 +119,10 @@ class Coordinador:
         config: ConfigCoordinador = ConfigCoordinador(),
         contexto: zmq.Context[zmq.Socket[bytes]] | None = None,
     ) -> None:
+        if config.metodo not in METODOS:
+            raise ValueError(f"método desconocido: {config.metodo!r} (opciones: {METODOS})")
+        if config.metodo == "pcg":
+            _validar_para_pcg(problema, config.opciones_internas)
         self.problema = problema
         self.config = config
         self.bloques: list[Bloque] = particionar(problema.n, config.tam_bloque)
@@ -102,15 +138,18 @@ class Coordinador:
         # Esclavos esperando trabajo: (identidad ZeroMQ, momento en que pidieron)
         self._ociosos: deque[tuple[bytes, float]] = deque()
         log.info(
-            "Coordinador en %s: n=%d, nnz=%d, %d bloques de hasta %d filas",
+            "Coordinador en %s (%s): n=%d, nnz=%d, %d bloques de hasta %d filas",
             self.endpoint,
+            config.metodo,
             problema.n,
             problema.A.nnz,
             len(self.bloques),
             config.tam_bloque,
         )
         if not problema.es_diagonal_dominante():
-            log.warning("A no es diagonal dominante: Jacobi podría no converger")
+            log.warning(
+                "A no es diagonal dominante (encadenada): no está garantizado que Jacobi converja"
+            )
 
     # --- ciclo de vida ------------------------------------------------------------
 
@@ -132,36 +171,120 @@ class Coordinador:
         inicio = time.perf_counter()
         x = np.zeros(self.problema.n)
         resultado = ResultadoGlobal(
-            x=x, convergio=False, iteraciones_externas=0, residuo=self.problema.residuo_relativo(x)
+            x=x,
+            convergio=False,
+            iteraciones_externas=0,
+            residuo=self.problema.residuo_relativo(x),
+            metodo=cfg.metodo,
         )
         try:
-            for k in range(1, cfg.max_iteraciones_externas + 1):
-                x = self._iteracion_externa(k, x, resultado, inicio)
-                residuo = self.problema.residuo_relativo(x)
-                resultado.x, resultado.residuo, resultado.iteraciones_externas = x, residuo, k
-                resultado.historial_residuos.append(residuo)
-                log.debug("iteración externa %d: residuo relativo %.3e", k, residuo)
-                if residuo <= cfg.tolerancia:
-                    resultado.convergio = True
-                    break
+            if cfg.metodo == "pcg":
+                self._gradiente_conjugado(resultado, inicio)
+            else:
+                self._jacobi(resultado, inicio)
             nivel = logging.INFO if resultado.convergio else logging.WARNING
             log.log(
                 nivel,
-                "%s en %d iteraciones externas, residuo %.3e",
+                "%s en %d iteraciones (%s, %d rondas), residuo %.3e",
                 "Convergió" if resultado.convergio else "NO convergió",
                 resultado.iteraciones_externas,
+                cfg.metodo,
+                resultado.rondas,
                 resultado.residuo,
             )
+            # El tiempo de resolución no incluye la despedida (un plazo fijo de
+            # `despedida_s` respondiendo FIN), que antes inflaba la medición.
+            resultado.segundos = time.perf_counter() - inicio
             self._despedir("problema resuelto")
         except BaseException:
             self._despedir("el coordinador se detuvo")
             raise
-        resultado.segundos = time.perf_counter() - inicio
         return resultado
 
-    def _iteracion_externa(
-        self, k: int, x: VectorF, resultado: ResultadoGlobal, inicio: float
+    def _jacobi(self, resultado: ResultadoGlobal, inicio: float) -> None:
+        """Jacobi por bloques: cada ronda devuelve directamente el nuevo x."""
+        cfg = self.config
+        x = resultado.x
+        for k in range(1, cfg.max_iteraciones_externas + 1):
+            x = self._ronda(k, self._datos, x, resultado, inicio)
+            residuo = self.problema.residuo_relativo(x)
+            resultado.x, resultado.residuo, resultado.iteraciones_externas = x, residuo, k
+            resultado.historial_residuos.append(residuo)
+            log.debug("iteración externa %d: residuo relativo %.3e", k, residuo)
+            if residuo <= cfg.tolerancia:
+                resultado.convergio = True
+                return
+
+    def _gradiente_conjugado(self, resultado: ResultadoGlobal, inicio: float) -> None:
+        """Gradiente conjugado precondicionado (flexible); M⁻¹·r lo calculan los esclavos."""
+        cfg = self.config
+        A, b = self.problema.A, self.problema.b
+        norma_b = float(np.linalg.norm(b)) or 1.0
+        x = resultado.x.copy()
+        r = b.copy()  # r⁰ = b - A·0
+        if resultado.residuo <= cfg.tolerancia:  # b = 0: x = 0 ya es la solución
+            resultado.convergio = True
+            return
+        z = self._precondicionar(1, r, resultado, inicio)
+        rz = float(r @ z)
+        d = z.copy()
+        for k in range(1, cfg.max_iteraciones_externas + 1):
+            if not np.isfinite(rz) or rz <= 0:
+                raise ErrorCalculo(
+                    f"el precondicionador no es definido positivo (r·z = {rz:.3e}); "
+                    "¿A es simétrica definida positiva?"
+                )
+            q = A @ d
+            dq = float(d @ q)
+            if not np.isfinite(dq) or dq <= 0:
+                raise ErrorCalculo(
+                    f"A no es definida positiva (d·A·d = {dq:.3e}): usar --metodo jacobi"
+                )
+            alfa = rz / dq
+            x = x + alfa * d
+            r = r - alfa * q
+            residuo = float(np.linalg.norm(r)) / norma_b
+            if residuo <= cfg.tolerancia:
+                # El residuo actualizado por recurrencia se aparta del verdadero por
+                # redondeo: antes de terminar se confirma con b - A·x (y si no
+                # alcanza, se sigue desde el residuo verdadero).
+                r = b - A @ x
+                residuo = float(np.linalg.norm(r)) / norma_b
+            resultado.x, resultado.residuo, resultado.iteraciones_externas = x, residuo, k
+            resultado.historial_residuos.append(residuo)
+            log.debug("iteración PCG %d: residuo relativo %.3e", k, residuo)
+            if residuo <= cfg.tolerancia:
+                resultado.convergio = True
+                return
+            z_nuevo = self._precondicionar(k + 1, r, resultado, inicio)
+            beta = float(r @ (z_nuevo - z)) / rz  # Polak-Ribière (CG flexible)
+            z, rz = z_nuevo, float(r @ z_nuevo)
+            d = z + beta * d
+
+    def _precondicionar(
+        self, k: int, r: VectorF, resultado: ResultadoGlobal, inicio: float
     ) -> VectorF:
+        """z = M⁻¹·r en los esclavos: cada uno resuelve A_BB·z_B = r_B con x_ext = 0.
+
+        Es el mismo trabajo que en Jacobi, con b_B reemplazado por r_B y x_global = 0
+        (las columnas externas no aportan y la iteración interna arranca de 0).
+        """
+        datos = [
+            replace(d, b_local=np.ascontiguousarray(r[b.rango]))
+            for b, d in zip(self.bloques, self._datos, strict=True)
+        ]
+        return self._ronda(k, datos, np.zeros_like(r), resultado, inicio)
+
+    def _ronda(
+        self,
+        k: int,
+        datos: list[DatosBloque],
+        x: VectorF,
+        resultado: ResultadoGlobal,
+        inicio: float,
+    ) -> VectorF:
+        """Reparte un trabajo por bloque (datos[i], x) y junta las soluciones locales."""
+        resultado.rondas = k
         cfg = self.config
         x_nuevo = np.empty_like(x)
         pendientes: deque[int] = deque(range(len(self.bloques)))
@@ -176,7 +299,7 @@ class Coordinador:
             ):
                 raise TimeoutError(f"se superaron {cfg.timeout_total_s} s")
             # Primero repartir: al empezar la iteración puede haber esclavos retenidos.
-            self._repartir(k, x, pendientes, en_curso, resultado)
+            self._repartir(k, datos, x, pendientes, en_curso, resultado)
 
             if self._poller.poll(timeout=100):
                 identidad, mensaje = self._recibir()
@@ -242,6 +365,7 @@ class Coordinador:
     def _repartir(
         self,
         k: int,
+        datos: list[DatosBloque],
         x: VectorF,
         pendientes: deque[int],
         en_curso: dict[int, float],
@@ -255,7 +379,7 @@ class Coordinador:
             trabajo = Trabajo(
                 iteracion=k,
                 bloque=indice,
-                datos=self._datos[indice],
+                datos=datos[indice],
                 x_global=x,
                 opciones=self.config.opciones_internas,
             )
@@ -287,3 +411,20 @@ class Coordinador:
 
     def _enviar(self, identidad: bytes, mensaje: Mensaje) -> None:
         self._socket.send_multipart([identidad, b"", *codificar(mensaje)], copy=False)
+
+
+def _validar_para_pcg(problema: Problema, opciones: Opciones) -> None:
+    """El gradiente conjugado exige A simétrica (y definida positiva, que se detecta
+    durante la iteración) y un precondicionador que haga al menos un barrido."""
+    A = problema.A
+    escala = float(abs(A).max()) or 1.0
+    asimetria = float(abs(A - A.T).max()) if A.nnz else 0.0
+    if asimetria > 1e-12 * escala:
+        raise ValueError(
+            f"el gradiente conjugado requiere A simétrica (max |a_ij - a_ji| = {asimetria:.3e}); "
+            "usar el método jacobi"
+        )
+    if np.any(A.diagonal() <= 0):
+        raise ValueError("el gradiente conjugado requiere A definida positiva (diagonal <= 0)")
+    if opciones.max_iteraciones < 1:
+        raise ValueError("con pcg los esclavos deben hacer al menos un barrido (max_iteraciones)")

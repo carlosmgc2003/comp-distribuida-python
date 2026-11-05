@@ -30,6 +30,30 @@ def test_placa_es_diagonal_dominante_y_coincide_con_spsolve() -> None:
     assert np.all(p.A.diagonal() == 4)
 
 
+@pytest.mark.parametrize(
+    ("A", "esperado"),
+    [
+        # Débil en todas y estricta en una, pero la fila 3 está aislada: singular.
+        ([[1, -1, 0], [-1, 1, 0], [0, 0, 2]], False),
+        ([[4, -1, 0], [-1, 4, -1], [0, -1, 4]], True),  # estrictamente dominante
+        ([[2, -1, 0], [-1, 2, -1], [0, -1, 2]], True),  # débil + irreducible (Laplaciano 1D)
+        ([[1, -2], [-2, 1]], False),  # no dominante
+        ([[0, 1], [1, 0]], False),  # diagonal nula
+        # Dos bloques desacoplados, cada uno débil + irreducible: sigue alcanzando.
+        ([[2, -1, 0, 0], [-1, 2, 0, 0], [0, 0, 3, -2], [0, 0, -2, 3]], True),
+        # Fila 0 débil que sólo llega a sí misma (no a la fila estricta 1).
+        ([[1, 0, -1], [-1, 3, 0], [-1, 0, 1]], False),
+    ],
+)
+def test_diagonal_dominante_encadenada(A: list[list[float]], esperado: bool) -> None:
+    p = Problema.crear(A, np.ones(len(A)))
+    assert p.es_diagonal_dominante() is esperado
+    if esperado:  # la condición garantiza ρ(J) < 1
+        M = np.asarray(A, dtype=float)
+        D = np.diag(np.diag(M))
+        assert max(abs(np.linalg.eigvals(np.linalg.solve(D, D - M)))) < 1
+
+
 def test_cargar_tolera_espacios_multiples(tmp_path: Path) -> None:
     # Con csv.reader(delimiter=' ') la segunda fila quedaba corrida de columna.
     (tmp_path / "A.txt").write_text("4 -1  0\n-1  4 -1\n 0 -1   4\n")
